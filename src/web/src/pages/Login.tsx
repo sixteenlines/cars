@@ -6,7 +6,7 @@ import { ErrorText, Field } from '../components/ui'
 import { keys, useMe } from '../hooks'
 
 export function Brand() {
-  return <div className="brand"><img src="/favicon.svg" alt="" /> Garage</div>
+  return <div className="brand"><img src="/icon-192.png" alt="" /> Car Tracker</div>
 }
 
 export default function Login() {

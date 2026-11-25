@@ -21,7 +21,7 @@ export default function Garage() {
 
   return (
     <>
-      <TopBar title="Garage">
+      <TopBar title="Car Tracker">
         {me?.isAdmin && <Link to="/admin" className="icon-btn" aria-label="Users & invites"><Users size={20} /></Link>}
         <button className="icon-btn" aria-label="Sign out" onClick={() => logout.mutate()}><LogOut size={20} /></button>
       </TopBar>

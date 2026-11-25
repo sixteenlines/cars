@@ -32,7 +32,7 @@ export default function Admin() {
   const copy = async () => {
     if (!link) return
     if (navigator.share && /iPhone|iPad|Android/i.test(navigator.userAgent)) {
-      await navigator.share({ title: 'Garage invite', url: link }).catch(() => {})
+      await navigator.share({ title: 'Car Tracker invite', url: link }).catch(() => {})
     } else {
       await navigator.clipboard.writeText(link)
       setCopied(true)

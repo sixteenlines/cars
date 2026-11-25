@@ -1,4 +1,4 @@
-# car-tracker ("Garage")
+# Car Tracker
 
 Self-hosted web app to track mods, maintenance and costs for multiple cars — for you and a few friends, invite-only.
 
