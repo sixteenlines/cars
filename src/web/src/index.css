@@ -182,8 +182,13 @@ img { display: block; max-width: 100%; }
   border: 1px solid var(--border); background: var(--surface); font-size: 16px; /* ≥16px: no iOS zoom */
 }
 .field textarea { min-height: 90px; resize: vertical; }
+/* iOS Safari: native date inputs have an intrinsic min-width (wider than half a phone screen), their own height
+   and centered text — reset that so they fit their grid cell and look like the other fields. */
+.field { min-width: 0; }
+.field input[type="date"] { -webkit-appearance: none; appearance: none; min-width: 0; display: block; line-height: 1.5; text-align: left; }
+.field input[type="date"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
 .input:focus, .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 550; }
 .check input { width: 20px; height: 20px; accent-color: var(--accent); }
 .error { color: var(--danger); font-size: 0.9rem; font-weight: 550; }
