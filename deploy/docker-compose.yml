@@ -1,0 +1,30 @@
+# Server stack. Lives in /opt/car-tracker next to .env, data/ and update.sh (see docs/DEPLOY.md).
+# Don't edit it on the server: update.sh replaces it with the version from the release it installs.
+name: car-tracker
+
+services:
+  app:
+    image: ghcr.io/sixteenlines/cars:${APP_VERSION:?APP_VERSION missing in .env - run ./update.sh}
+    restart: unless-stopped
+    environment:
+      PublicUrl: ${PUBLIC_URL:?PUBLIC_URL missing in .env, e.g. https://cars.example.com}
+      TrustForwardedHeaders: "true"   # only cloudflared can reach the app (no published ports)
+      TZ: Europe/Berlin               # "today" for fill-ups, month boundaries in stats
+      Ai__ApiKey: ${OPENAI_API_KEY:-}   # empty → no AI, bills/fuel can still be entered by hand
+      Ai__Model: ${OPENAI_MODEL:-gpt-5-mini}
+      Ai__MonthlyLimitPerUser: ${AI_MONTHLY_LIMIT_PER_USER:-60}
+      Ai__MonthlyFuelScansPerUser: ${AI_MONTHLY_FUEL_SCANS_PER_USER:-100}
+    volumes:
+      - ./data:/data                  # SQLite DB, photos, bills, cookie keys → the folder to back up
+    # For debugging from the LAN you can temporarily publish the port:
+    # ports:
+    #   - "8080:8080"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN missing in .env}
+    depends_on:
+      - app

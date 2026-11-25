@@ -1,0 +1,10 @@
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/_data
+.git
+.claude
+tests
+deploy/data
+*.md
