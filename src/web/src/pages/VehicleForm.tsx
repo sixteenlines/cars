@@ -5,6 +5,7 @@ import { api, type Vehicle, type VehicleInput } from '../api'
 import { ConfirmButton, ErrorText, Field, Spinner, TopBar } from '../components/ui'
 import { parseDecimal, parseIntOrNull, toInput } from '../format'
 import { keys, useVehicle } from '../hooks'
+import { t } from '../i18n'
 
 type Form = Record<'name' | 'make' | 'model' | 'year' | 'badge' | 'colorExterior' | 'colorInterior' | 'plate' | 'vin'
   | 'purchasePrice' | 'purchaseDate' | 'purchaseOdometer' | 'currentOdometer' | 'notes', string> & { includePurchaseInTotals: boolean }
@@ -39,7 +40,7 @@ export default function VehicleForm() {
   const save = useMutation({
     mutationFn: () => {
       const price = parseDecimal(f.purchasePrice)
-      if (Number.isNaN(price)) throw new Error('Purchase price is not a number.')
+      if (Number.isNaN(price)) throw new Error(t('Purchase price is not a number.', 'Der Kaufpreis ist keine Zahl.'))
       const body: VehicleInput = {
         name: f.name, make: f.make || null, model: f.model || null, year: parseIntOrNull(f.year), badge: f.badge || null,
         colorExterior: f.colorExterior || null, colorInterior: f.colorInterior || null, plate: f.plate || null, vin: f.vin || null,
@@ -64,42 +65,42 @@ export default function VehicleForm() {
 
   return (
     <>
-      <TopBar back title={isEdit ? `Edit ${vehicle?.name}` : 'New car'} />
+      <TopBar back title={isEdit ? t(`Edit ${vehicle?.name}`, `${vehicle?.name} bearbeiten`) : t('New car', 'Neues Auto')} />
       <form className="form" onSubmit={e => { e.preventDefault(); save.mutate() }}>
-        <Field label="Name *" hint="What you call it, e.g. “M2” or “Winter E46”.">
+        <Field label="Name *" hint={t('What you call it, e.g. “M2” or “Winter E46”.', 'Wie du es nennst, z. B. „M2“ oder „Winter-E46“.')}>
           <input required maxLength={100} value={f.name} onChange={set('name')} autoFocus={!isEdit} />
         </Field>
         <div className="grid-2">
-          <Field label="Make"><input value={f.make} onChange={set('make')} placeholder="BMW" /></Field>
-          <Field label="Model"><input value={f.model} onChange={set('model')} placeholder="M2" /></Field>
-          <Field label="Year"><input inputMode="numeric" value={f.year} onChange={set('year')} /></Field>
-          <Field label="Variant / badge"><input value={f.badge} onChange={set('badge')} placeholder="730d" /></Field>
-          <Field label="Colour (outside)"><input value={f.colorExterior} onChange={set('colorExterior')} /></Field>
-          <Field label="Colour (inside)"><input value={f.colorInterior} onChange={set('colorInterior')} /></Field>
-          <Field label="Plate"><input value={f.plate} onChange={set('plate')} autoCapitalize="characters" /></Field>
-          <Field label="Current odometer (km)"><input inputMode="numeric" value={f.currentOdometer} onChange={set('currentOdometer')} /></Field>
+          <Field label={t('Make', 'Marke')}><input value={f.make} onChange={set('make')} placeholder="BMW" /></Field>
+          <Field label={t('Model', 'Modell')}><input value={f.model} onChange={set('model')} placeholder="M2" /></Field>
+          <Field label={t('Year', 'Baujahr')}><input inputMode="numeric" value={f.year} onChange={set('year')} /></Field>
+          <Field label={t('Variant / badge', 'Variante / Typ')}><input value={f.badge} onChange={set('badge')} placeholder="730d" /></Field>
+          <Field label={t('Colour (outside)', 'Farbe (außen)')}><input value={f.colorExterior} onChange={set('colorExterior')} /></Field>
+          <Field label={t('Colour (inside)', 'Farbe (innen)')}><input value={f.colorInterior} onChange={set('colorInterior')} /></Field>
+          <Field label={t('Plate', 'Kennzeichen')}><input value={f.plate} onChange={set('plate')} autoCapitalize="characters" /></Field>
+          <Field label={t('Current odometer (km)', 'Aktueller km-Stand')}><input inputMode="numeric" value={f.currentOdometer} onChange={set('currentOdometer')} /></Field>
         </div>
-        <Field label="VIN"><input value={f.vin} onChange={set('vin')} maxLength={17} autoCapitalize="characters" /></Field>
+        <Field label={t('VIN', 'FIN')}><input value={f.vin} onChange={set('vin')} maxLength={17} autoCapitalize="characters" /></Field>
 
-        <h2 style={{ marginTop: 8 }}>Purchase</h2>
+        <h2 style={{ marginTop: 8 }}>{t('Purchase', 'Kauf')}</h2>
         <div className="grid-2">
-          <Field label="Price (€)"><input inputMode="decimal" value={f.purchasePrice} onChange={set('purchasePrice')} /></Field>
-          <Field label="Date"><input type="date" value={f.purchaseDate} onChange={set('purchaseDate')} /></Field>
-          <Field label="Odometer (km)"><input inputMode="numeric" value={f.purchaseOdometer} onChange={set('purchaseOdometer')} /></Field>
+          <Field label={t('Price (€)', 'Preis (€)')}><input inputMode="decimal" value={f.purchasePrice} onChange={set('purchasePrice')} /></Field>
+          <Field label={t('Date', 'Datum')}><input type="date" value={f.purchaseDate} onChange={set('purchaseDate')} /></Field>
+          <Field label={t('Odometer (km)', 'km-Stand')}><input inputMode="numeric" value={f.purchaseOdometer} onChange={set('purchaseOdometer')} /></Field>
         </div>
         <label className="check">
           <input type="checkbox" checked={f.includePurchaseInTotals} onChange={set('includePurchaseInTotals')} />
-          Count purchase price in “total spent”
+          {t('Count purchase price in “total spent”', 'Kaufpreis in „Gesamtkosten“ einrechnen')}
         </label>
-        <Field label="Notes"><textarea value={f.notes} onChange={set('notes')} /></Field>
+        <Field label={t('Notes', 'Notizen')}><textarea value={f.notes} onChange={set('notes')} /></Field>
 
         <ErrorText error={save.error ?? remove.error} />
         {isEdit && (
-          <ConfirmButton onConfirm={() => remove.mutate()} confirmLabel={`Tap again: delete ${vehicle?.name} with all entries & photos`}>Delete car</ConfirmButton>
+          <ConfirmButton onConfirm={() => remove.mutate()} confirmLabel={t(`Tap again: delete ${vehicle?.name} with all entries & photos`, `Nochmal tippen: ${vehicle?.name} mit allen Einträgen & Fotos löschen`)}>{t('Delete car', 'Auto löschen')}</ConfirmButton>
         )}
         <div className="form-actions">
-          <button type="button" className="btn" onClick={() => navigate(-1)}>Cancel</button>
-          <button className="btn btn-primary" disabled={save.isPending}>{save.isPending ? <Spinner size={18} /> : 'Save'}</button>
+          <button type="button" className="btn" onClick={() => navigate(-1)}>{t('Cancel', 'Abbrechen')}</button>
+          <button className="btn btn-primary" disabled={save.isPending}>{save.isPending ? <Spinner size={18} /> : t('Save', 'Speichern')}</button>
         </div>
       </form>
     </>

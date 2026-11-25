@@ -14,7 +14,7 @@ public static class OpenAiResponses
         string instructions, JsonObject filePart, string prompt, string schemaName, JsonObject schema, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(options.ApiKey))
-            return new(null, "No OpenAI API key configured (Ai:ApiKey).", null, 0, 0, 0, false);
+            return new(null, Loc.T("No OpenAI API key configured (Ai:ApiKey).", "Kein OpenAI-Schlüssel eingerichtet (Ai:ApiKey)."), null, 0, 0, 0, false);
 
         var body = new JsonObject
         {
@@ -48,7 +48,7 @@ public static class OpenAiResponses
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
             log.LogWarning(ex, "OpenAI request failed");
-            return new(null, "Couldn't reach OpenAI. Try again later.", options.Model, 0, 0, 0, true);
+            return new(null, Loc.T("Couldn't reach OpenAI. Try again later.", "OpenAI ist gerade nicht erreichbar. Versuch es später nochmal."), options.Model, 0, 0, 0, true);
         }
 
         var json = await res.Content.ReadAsStringAsync(ct);
@@ -56,7 +56,7 @@ public static class OpenAiResponses
         {
             log.LogWarning("OpenAI returned {Status}: {Body}", (int)res.StatusCode, json.Length > 2000 ? json[..2000] : json);
             var msg = TryGetErrorMessage(json) ?? res.ReasonPhrase;
-            return new(null, $"OpenAI error ({(int)res.StatusCode}): {msg}", options.Model, 0, 0, 0, true);
+            return new(null, Loc.T($"OpenAI error ({(int)res.StatusCode}): {msg}", $"OpenAI-Fehler ({(int)res.StatusCode}): {msg}"), options.Model, 0, 0, 0, true);
         }
         return Parse(json, options);
     }
@@ -83,7 +83,7 @@ public static class OpenAiResponses
         }
 
         if (text is null)
-            return new(null, refusal is null ? "The AI returned no result." : $"The AI refused: {refusal}", model, inTok, outTok, cost, true);
+            return new(null, refusal is null ? Loc.T("The AI returned no result.", "Die KI hat kein Ergebnis geliefert.") : Loc.T($"The AI refused: {refusal}", $"Die KI hat abgelehnt: {refusal}"), model, inTok, outTok, cost, true);
         return new(text, null, model, inTok, outTok, cost, true);
     }
 

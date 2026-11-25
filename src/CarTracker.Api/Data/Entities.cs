@@ -7,6 +7,8 @@ public class AppUser : IdentityUser
 {
     public string DisplayName { get; set; } = "";
     public bool IsAdmin { get; set; }
+    /// <summary>"en" or "de"; null = follow the browser.</summary>
+    public string? Language { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 

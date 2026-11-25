@@ -6,6 +6,7 @@ import { api, uploadDocument, type BillListItem } from '../api'
 import { ErrorText, Spinner, TopBar } from '../components/ui'
 import { fmtDate, fmtMoney } from '../format'
 import { useVehicles } from '../hooks'
+import { t } from '../i18n'
 
 export const inboxKey = ['documents', 'open'] as const
 export const useInbox = () =>
@@ -15,7 +16,10 @@ export const useInbox = () =>
     refetchInterval: q => (q.state.data?.some(d => d.status === 'Processing') ? 2000 : false),
   })
 
-const STATUS_LABEL = { Processing: 'Reading…', Ready: 'Ready to review', Failed: 'Needs manual input', Imported: 'Imported' }
+const statusLabel = (s: BillListItem['status']) => ({
+  Processing: t('Reading…', 'Wird gelesen…'), Ready: t('Ready to review', 'Bereit zum Prüfen'),
+  Failed: t('Needs manual input', 'Manuelle Eingabe nötig'), Imported: t('Imported', 'Importiert'),
+})[s]
 
 export default function ImportUpload() {
   const [params] = useSearchParams()
@@ -54,7 +58,7 @@ export default function ImportUpload() {
 
   return (
     <>
-      <TopBar back={vehicleId ? `/vehicles/${vehicleId}` : '/'} title="Import bill" />
+      <TopBar back={vehicleId ? `/vehicles/${vehicleId}` : '/'} title={t('Import bill', 'Rechnung importieren')} />
 
       <div
         className={`card dropzone ${over ? 'over' : ''}`}
@@ -63,20 +67,21 @@ export default function ImportUpload() {
         onDrop={e => { e.preventDefault(); setOver(false); upload(e.dataTransfer.files) }}
       >
         {busy > 0 ? <Spinner size={36} /> : <FileUp size={40} />}
-        <h2>{busy > 0 ? `Uploading${busy > 1 ? ` (${busy} left)` : ''}…` : 'Add a bill'}</h2>
+        <h2>{busy > 0 ? `${t('Uploading', 'Lädt hoch')}${busy > 1 ? t(` (${busy} left)`, ` (noch ${busy})`) : ''}…` : t('Add a bill', 'Rechnung hinzufügen')}</h2>
         <p className="muted" style={{ margin: 0 }}>
-          PDF invoice or a photo of a receipt. Parts, prices and shop are filled in for you
-          {vehicleId && vehicleName(vehicleId) ? <> for <strong>{vehicleName(vehicleId)}</strong></> : null}.
+          {t('PDF invoice or a photo of a receipt. Parts, prices and shop are filled in for you',
+            'PDF-Rechnung oder Foto eines Belegs. Teile, Preise und Werkstatt werden automatisch ausgefüllt')}
+          {vehicleId && vehicleName(vehicleId) ? <> {t('for', 'für')} <strong>{vehicleName(vehicleId)}</strong></> : null}.
         </p>
         <div className="row wrap" style={{ justifyContent: 'center', marginTop: 8 }}>
           <button className="btn btn-primary" disabled={busy > 0} onClick={() => fileInput.current?.click()}>
-            <FileText size={18} /> Choose file
+            <FileText size={18} /> {t('Choose file', 'Datei wählen')}
           </button>
           <button className="btn" disabled={busy > 0} onClick={() => cameraInput.current?.click()}>
-            <Camera size={18} /> Photo
+            <Camera size={18} /> {t('Photo', 'Foto')}
           </button>
         </div>
-        <p className="faint hide-touch" style={{ margin: 0 }}>…or drop files here</p>
+        <p className="faint hide-touch" style={{ margin: 0 }}>{t('…or drop files here', '…oder Dateien hierher ziehen')}</p>
         <input ref={fileInput} type="file" hidden multiple accept="application/pdf,.pdf,image/*,.heic,.heif"
           onChange={e => { upload(e.target.files); e.target.value = '' }} />
         <input ref={cameraInput} type="file" hidden accept="image/*" capture="environment"
@@ -86,7 +91,7 @@ export default function ImportUpload() {
 
       {inbox.length > 0 && (
         <div className="section">
-          <h2>Waiting for review</h2>
+          <h2>{t('Waiting for review', 'Warten auf Prüfung')}</h2>
           <div className="card list">
             {inbox.map(d => <InboxRow key={d.id} doc={d} vehicleName={vehicleName(d.vehicleId)} />)}
           </div>
@@ -104,7 +109,7 @@ export function InboxRow({ doc, vehicleName }: { doc: BillListItem; vehicleName?
       </span>
       <div className="main">
         <div className="t">{doc.vendor ?? doc.fileName}</div>
-        <div className="s">{[STATUS_LABEL[doc.status], vehicleName, doc.invoiceDate ? fmtDate(doc.invoiceDate) : null].filter(Boolean).join(' · ')}</div>
+        <div className="s">{[statusLabel(doc.status), vehicleName, doc.invoiceDate ? fmtDate(doc.invoiceDate) : null].filter(Boolean).join(' · ')}</div>
       </div>
       {doc.total != null && <div className="amount">{fmtMoney(doc.total)}</div>}
     </Link>

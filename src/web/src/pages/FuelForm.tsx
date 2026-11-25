@@ -4,14 +4,15 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api, FUEL_GRADES, scanFuel, type FuelGrade, type FuelScan, type FuelUp, type FuelUpInput } from '../api'
 import { ConfirmButton, ErrorText, Field, Spinner, TopBar } from '../components/ui'
-import { fmtKm, parseDecimal, parseIntOrNull, today } from '../format'
+import { fmtKm, fmtNum, parseDecimal, parseIntOrNull, toInput, today } from '../format'
 import { keys, useFuel, useFuelUp, useVehicle } from '../hooks'
+import { t } from '../i18n'
 
 type Num = 'total' | 'ppl' | 'liters'
 const ALL: Num[] = ['total', 'ppl', 'liters']
 const DECIMALS: Record<Num, number> = { total: 2, ppl: 3, liters: 2 }
 
-const show = (n: number | null | undefined, field: Num) => (n == null ? '' : n.toFixed(DECIMALS[field]).replace('.', ','))
+const show = (n: number | null | undefined, field: Num) => toInput(n, DECIMALS[field])
 const pos = (s: string) => {
   const n = parseDecimal(s)
   return n != null && !Number.isNaN(n) && n > 0 ? n : null
@@ -101,7 +102,7 @@ export default function FuelForm() {
   const save = useMutation({
     mutationFn: () => {
       const total = pos(nums.total), liters = pos(nums.liters), ppl = pos(nums.ppl)
-      if (!total && !(liters && ppl)) throw new Error('Enter the total, or litres and price per litre.')
+      if (!total && !(liters && ppl)) throw new Error(t('Enter the total, or litres and price per litre.', 'Gib den Betrag ein – oder Liter und Literpreis.'))
       const body: FuelUpInput = {
         date: date || null, odometer: parseIntOrNull(odometer), grade, liters, pricePerLiter: ppl, total,
         fullTank, station: station.trim() || null, notes: existing?.notes ?? null,
@@ -124,20 +125,20 @@ export default function FuelForm() {
 
   const numField = (field: Num, label: string) => (
     <label className={`field fuel-num ${computed === field ? 'computed' : ''}`}>
-      <span>{label}{computed === field && <em> · auto</em>}</span>
+      <span>{label}{computed === field && <em> · {t('auto', 'auto')}</em>}</span>
       <input inputMode="decimal" enterKeyHint="next" value={nums[field]} onChange={edit(field)} />
     </label>
   )
 
   return (
     <>
-      <TopBar back title={`${isEdit ? 'Edit fill-up' : 'Fuel'}${vehicle ? ` · ${vehicle.name}` : ''}`} />
+      <TopBar back title={`${isEdit ? t('Edit fill-up', 'Tanken bearbeiten') : t('Fuel', 'Tanken')}${vehicle ? ` · ${vehicle.name}` : ''}`} />
       <form className="form fuel-form" onSubmit={e => { e.preventDefault(); save.mutate() }}>
         <div className="scan-row">
           <button type="button" className="btn scan-btn" disabled={scan.isPending} onClick={() => camera.current?.click()}>
-            {scan.isPending ? <><Spinner size={18} /> Reading photo…</> : <><Camera size={20} /> Scan pump or receipt</>}
+            {scan.isPending ? <><Spinner size={18} /> {t('Reading photo…', 'Foto wird gelesen…')}</> : <><Camera size={20} /> {t('Scan pump or receipt', 'Zapfsäule oder Beleg scannen')}</>}
           </button>
-          <button type="button" className="btn" aria-label="Pick photo from library" disabled={scan.isPending}
+          <button type="button" className="btn" aria-label={t('Pick photo from library', 'Foto aus der Mediathek wählen')} disabled={scan.isPending}
             onClick={() => library.current?.click()}><Images size={20} /></button>
           <input ref={camera} type="file" accept="image/*" capture="environment" hidden onChange={onPhoto} />
           <input ref={library} type="file" accept="image/*,.heic,.heif" hidden onChange={onPhoto} />
@@ -147,15 +148,15 @@ export default function FuelForm() {
           <div className={`scan-note ${scanned.warnings.length ? 'warn' : ''}`}>
             {scanned.warnings.length ? <TriangleAlert size={16} /> : null}
             <span>
-              Read from the {scanned.source === 'receipt' ? 'receipt' : 'pump display'}
-              {scanned.productName ? ` (${scanned.productName})` : ''}. Check the numbers.
-              {!scanned.grade && scanned.productName ? ' Pick the grade below.' : ''}
+              {scanned.source === 'receipt' ? t('Read from the receipt', 'Vom Beleg gelesen') : t('Read from the pump display', 'Von der Zapfsäule gelesen')}
+              {scanned.productName ? ` (${scanned.productName})` : ''}. {t('Check the numbers.', 'Prüf die Zahlen.')}
+              {!scanned.grade && scanned.productName ? t(' Pick the grade below.', ' Wähl unten die Sorte.') : ''}
               {scanned.warnings.map(w => <span key={w} className="block">{w}</span>)}
             </span>
           </div>
         )}
 
-        <div className="grade-chips" role="radiogroup" aria-label="Fuel grade">
+        <div className="grade-chips" role="radiogroup" aria-label={t('Fuel grade', 'Kraftstoffsorte')}>
           {FUEL_GRADES.map(g => (
             <button key={g.value} type="button" role="radio" aria-checked={grade === g.value}
               className={`chip grade ${grade === g.value ? 'active' : ''}`} onClick={() => pickGrade(g.value)}>{g.label}</button>
@@ -163,32 +164,32 @@ export default function FuelForm() {
         </div>
 
         <div className="fuel-nums">
-          {numField('total', 'Total €')}
-          {numField('ppl', '€ / litre')}
-          {numField('liters', 'Litres')}
+          {numField('total', t('Total €', 'Betrag €'))}
+          {numField('ppl', t('€ / litre', '€ / Liter'))}
+          {numField('liters', t('Litres', 'Liter'))}
         </div>
 
         <div className="grid-2">
-          <Field label="Odometer (km)"
-            hint={since != null ? (since >= 0 ? `+${since.toLocaleString('de-DE')} km since last fill-up` : 'Lower than the last reading') : undefined}>
+          <Field label={t('Odometer (km)', 'km-Stand')}
+            hint={since != null ? (since >= 0 ? t(`+${fmtNum(since)} km since last fill-up`, `+${fmtNum(since)} km seit dem letzten Tanken`) : t('Lower than the last reading', 'Weniger als beim letzten Mal')) : undefined}>
             <input inputMode="numeric" value={odometer} onChange={e => setOdometer(e.target.value)}
-              placeholder={lastOdo != null ? `last ${fmtKm(lastOdo)}` : 'optional'} />
+              placeholder={lastOdo != null ? `${t('last', 'zuletzt')} ${fmtKm(lastOdo)}` : 'optional'} />
           </Field>
           <label className="check" style={{ alignSelf: 'end' }}>
             <input type="checkbox" checked={fullTank} onChange={e => setFullTank(e.target.checked)} />
-            Full tank
+            {t('Full tank', 'Vollgetankt')}
           </label>
-          <Field label="Date"><input type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
-          <Field label="Station"><input value={station} onChange={e => setStation(e.target.value)} placeholder="optional" /></Field>
+          <Field label={t('Date', 'Datum')}><input type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
+          <Field label={t('Station', 'Tankstelle')}><input value={station} onChange={e => setStation(e.target.value)} placeholder="optional" /></Field>
         </div>
-        {!fullTank && <p className="faint" style={{ margin: 0 }}>Partial fill-ups count towards the consumption of the next full tank.</p>}
+        {!fullTank && <p className="faint" style={{ margin: 0 }}>{t('Partial fill-ups count towards the consumption of the next full tank.', 'Teilfüllungen zählen zum Verbrauch der nächsten vollen Tankfüllung.')}</p>}
 
         <ErrorText error={save.error ?? remove.error} />
         <button className="btn btn-primary btn-big" disabled={save.isPending || scan.isPending}>
-          {save.isPending ? <Spinner size={18} /> : isEdit ? 'Save' : 'Save fill-up'}
+          {save.isPending ? <Spinner size={18} /> : isEdit ? t('Save', 'Speichern') : t('Save fill-up', 'Tanken speichern')}
         </button>
         {isEdit && (
-          <ConfirmButton onConfirm={() => remove.mutate()} confirmLabel="Tap again to delete this fill-up">Delete fill-up</ConfirmButton>
+          <ConfirmButton onConfirm={() => remove.mutate()} confirmLabel={t('Tap again to delete this fill-up', 'Nochmal tippen zum Löschen')}>{t('Delete fill-up', 'Tanken löschen')}</ConfirmButton>
         )}
       </form>
     </>

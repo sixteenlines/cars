@@ -42,7 +42,7 @@ public class DocumentStorage(StorageOptions storage)
             }
             catch (MagickException ex)
             {
-                throw new InvalidImageException($"“{fileName}” is neither a PDF nor a readable image.", ex);
+                throw new InvalidImageException(Loc.T($"“{fileName}” is neither a PDF nor a readable image.", $"„{fileName}“ ist weder ein PDF noch ein lesbares Bild."), ex);
             }
             (contentType, ext) = ("image/jpeg", ".jpg");
         }
@@ -112,17 +112,21 @@ public class ExtractionWorker(ExtractionQueue queue, IServiceScopeFactory scopes
         var doc = await db.Documents.FirstOrDefaultAsync(d => d.Id == id, ct);
         if (doc is null || doc.Status != DocumentStatus.Processing) return;
 
+        // Messages stored with the bill and the AI's tag suggestions use the uploader's language.
+        var language = await db.Users.Where(u => u.Id == doc.OwnerId).Select(u => u.Language).FirstOrDefaultAsync(ct) ?? "en";
+        using var _ = Loc.Use(language);
+
         ExtractionResult result;
         try
         {
             var bytes = await File.ReadAllBytesAsync(storage.FilePath(doc.StorageKey), ct);
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeout.CancelAfter(TimeSpan.FromMinutes(3));
-            result = await extractor.ExtractAsync(bytes, doc.ContentType, doc.FileName, timeout.Token);
+            result = await extractor.ExtractAsync(bytes, doc.ContentType, doc.FileName, language, timeout.Token);
         }
         catch (Exception ex) when (ex is IOException or OperationCanceledException && !ct.IsCancellationRequested)
         {
-            result = new(null, "Reading the bill timed out or failed. Try again.", null, 0, 0, 0, false);
+            result = new(null, Loc.T("Reading the bill timed out or failed. Try again.", "Das Lesen der Rechnung hat zu lange gedauert oder ist fehlgeschlagen. Versuch es nochmal."), null, 0, 0, 0, false);
         }
 
         doc.AiCalled |= result.AiCalled;

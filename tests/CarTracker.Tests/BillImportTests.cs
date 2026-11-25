@@ -13,7 +13,7 @@ namespace CarTracker.Tests;
 /// <summary>Instant, deterministic extractor so tests never call OpenAI.</summary>
 public class StubExtractor : IBillExtractor
 {
-    public Task<ExtractionResult> ExtractAsync(byte[] content, string contentType, string fileName, CancellationToken ct) =>
+    public Task<ExtractionResult> ExtractAsync(byte[] content, string contentType, string fileName, string language, CancellationToken ct) =>
         Task.FromResult(new ExtractionResult(new BillExtraction
         {
             IsInvoice = true, Vendor = "Teileshop", InvoiceNumber = "R-1001", InvoiceDate = "2026-11-20", Currency = "EUR",

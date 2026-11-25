@@ -37,7 +37,7 @@ public record BillLine
     [JsonPropertyName("total")] public decimal Total { get; init; }
     /// <summary>part | labour | shipping | discount | fee | other</summary>
     [JsonPropertyName("line_type")] public string LineType { get; init; } = "part";
-    /// <summary>Short English category like "brakes", "suspension", "oil" — becomes a tag suggestion.</summary>
+    /// <summary>Short category in the user's language ("brakes" / "bremsen") — becomes a tag suggestion.</summary>
     [JsonPropertyName("category")] public string? Category { get; init; }
     /// <summary>upgrade (→ Mod) | repair | service (→ Maintenance) | other (→ Expense). A guess the user can change.</summary>
     [JsonPropertyName("purpose")] public string Purpose { get; init; } = "repair";
@@ -49,7 +49,8 @@ public record ExtractionResult(
 public interface IBillExtractor
 {
     /// <param name="content">PDF bytes, or a JPEG for photographed receipts.</param>
-    Task<ExtractionResult> ExtractAsync(byte[] content, string contentType, string fileName, CancellationToken ct);
+    /// <param name="language">"en" or "de": language for category (tag) suggestions.</param>
+    Task<ExtractionResult> ExtractAsync(byte[] content, string contentType, string fileName, string language, CancellationToken ct);
 }
 
 public static class BillChecks
@@ -58,16 +59,17 @@ public static class BillChecks
     public static List<string> Warnings(BillExtraction x)
     {
         var w = new List<string>();
-        if (!x.IsInvoice) w.Add("This doesn't look like an invoice or receipt.");
-        if (x.LineItems.Count == 0) w.Add("No line items found.");
+        if (!x.IsInvoice) w.Add(Loc.T("This doesn't look like an invoice or receipt.", "Das sieht nicht nach einer Rechnung oder Quittung aus."));
+        if (x.LineItems.Count == 0) w.Add(Loc.T("No line items found.", "Keine Positionen gefunden."));
         if (x.GrandTotal is { } total && x.LineItems.Count > 0)
         {
             var sum = x.LineItems.Sum(l => l.Total);
             if (Math.Abs(sum - total) > 0.05m)
-                w.Add($"Line items add up to {sum:0.00} but the bill total is {total:0.00}. Please check.");
+                w.Add(Loc.T($"Line items add up to {Loc.Money(sum)} but the bill total is {Loc.Money(total)}. Please check.",
+                    $"Die Positionen ergeben {Loc.Money(sum)}, die Rechnungssumme ist aber {Loc.Money(total)}. Bitte prüfen."));
         }
         if (x.Currency is { Length: > 0 } c && !c.Equals("EUR", StringComparison.OrdinalIgnoreCase))
-            w.Add($"Bill currency is {c}; amounts are imported as-is.");
+            w.Add(Loc.T($"Bill currency is {c}; amounts are imported as-is.", $"Die Rechnung ist in {c}; die Beträge werden unverändert übernommen."));
         return w;
     }
 }

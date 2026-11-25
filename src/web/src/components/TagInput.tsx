@@ -1,6 +1,7 @@
 import { X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTags } from '../hooks'
+import { t as tr } from '../i18n'
 
 export const normalizeTag = (raw: string) =>
   raw.trim().replace(/^#+/, '').trim().toLowerCase().split(/\s+/).filter(Boolean).join('_').slice(0, 50)
@@ -26,12 +27,12 @@ export function TagInput({ value, onChange }: { value: string[]; onChange: (tags
       <div className="tag-input">
         {value.map(t => (
           <span key={t} className="tag">#{t}
-            <button type="button" aria-label={`Remove ${t}`} onClick={() => onChange(value.filter(x => x !== t))}><X size={14} /></button>
+            <button type="button" aria-label={tr(`Remove ${t}`, `${t} entfernen`)} onClick={() => onChange(value.filter(x => x !== t))}><X size={14} /></button>
           </span>
         ))}
         <input
           value={text}
-          placeholder={value.length ? '' : 'e.g. suspension, track, oem'}
+          placeholder={value.length ? '' : tr('e.g. suspension, track, oem', 'z. B. fahrwerk, rennstrecke, oem')}
           enterKeyHint="done"
           onChange={e => {
             const v = e.target.value

@@ -38,6 +38,7 @@ builder.Services
         o.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
     })
     .AddEntityFrameworkStores<AppDbContext>()
+    .AddErrorDescriber<LocalizedIdentityErrorDescriber>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
 
@@ -118,6 +119,13 @@ if (app.Configuration.GetValue<bool>("TrustForwardedHeaders"))
 }
 
 app.UseExceptionHandler();
+// UI language per request (Accept-Language from the SPA). Only the UI culture changes; number/date parsing stays invariant.
+app.UseRequestLocalization(new RequestLocalizationOptions
+{
+    DefaultRequestCulture = new Microsoft.AspNetCore.Localization.RequestCulture("en"),
+    SupportedCultures = [System.Globalization.CultureInfo.GetCultureInfo("en")],
+    SupportedUICultures = [System.Globalization.CultureInfo.GetCultureInfo("en"), Loc.German, System.Globalization.CultureInfo.GetCultureInfo("de")],
+});
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAuthentication();

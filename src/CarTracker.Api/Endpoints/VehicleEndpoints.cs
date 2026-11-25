@@ -67,8 +67,8 @@ public static class VehicleEndpoints
     private static IResult? Validate(VehicleRequest r)
     {
         if (string.IsNullOrWhiteSpace(r.Name) || r.Name.Trim().Length > 100)
-            return Results.Problem("Name is required (max. 100 characters).", statusCode: 400);
-        if (r.Year is < 1886 or > 2100) return Results.Problem("Year looks wrong.", statusCode: 400);
+            return Loc.Problem("Name is required (max. 100 characters).", "Ein Name ist nötig (max. 100 Zeichen).", 400);
+        if (r.Year is < 1886 or > 2100) return Loc.Problem("Year looks wrong.", "Das Baujahr sieht falsch aus.", 400);
         return null;
     }
 

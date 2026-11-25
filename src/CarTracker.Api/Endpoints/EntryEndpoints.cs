@@ -90,14 +90,14 @@ public static class EntryEndpoints
     internal static async Task<IResult?> Validate(AppDbContext db, EntryRequest r, int vehicleId, int? selfId)
     {
         if (string.IsNullOrWhiteSpace(r.Title) || r.Title.Trim().Length > 200)
-            return Results.Problem("Title is required (max. 200 characters).", statusCode: 400);
+            return Loc.Problem("Title is required (max. 200 characters).", "Ein Titel ist nötig (max. 200 Zeichen).", 400);
         if (r.EndDate is not null && r.Date is not null && r.EndDate < r.Date)
-            return Results.Problem("End date is before the start date.", statusCode: 400);
-        if (r.Odometer is < 0) return Results.Problem("Odometer can't be negative.", statusCode: 400);
+            return Loc.Problem("End date is before the start date.", "Das Enddatum liegt vor dem Startdatum.", 400);
+        if (r.Odometer is < 0) return Loc.Problem("Odometer can't be negative.", "Der Kilometerstand kann nicht negativ sein.", 400);
         if (r.LineItems?.Any(l => string.IsNullOrWhiteSpace(l.Name)) == true)
-            return Results.Problem("Every part needs a name.", statusCode: 400);
+            return Loc.Problem("Every part needs a name.", "Jedes Teil braucht einen Namen.", 400);
         if (r.RelatedEntryId is { } rel && (rel == selfId || !await db.Entries.AnyAsync(e => e.Id == rel && e.VehicleId == vehicleId)))
-            return Results.Problem("Linked entry not found on this vehicle.", statusCode: 400);
+            return Loc.Problem("Linked entry not found on this vehicle.", "Verknüpfter Eintrag bei diesem Auto nicht gefunden.", 400);
         return null;
     }
 

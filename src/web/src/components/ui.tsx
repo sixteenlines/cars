@@ -1,15 +1,16 @@
 import { ChevronLeft, LoaderCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { t } from '../i18n'
 
-export const Spinner = ({ size = 22 }: { size?: number }) => <LoaderCircle size={size} className="spin" aria-label="Loading" />
+export const Spinner = ({ size = 22 }: { size?: number }) => <LoaderCircle size={size} className="spin" aria-label={t('Loading', 'Lädt')} />
 
 export function TopBar({ title, back, children }: { title?: React.ReactNode; back?: string | true; children?: React.ReactNode }) {
   const navigate = useNavigate()
   return (
     <header className="topbar">
       {back && (
-        <button className="icon-btn" aria-label="Back" style={{ marginLeft: -10 }}
+        <button className="icon-btn" aria-label={t('Back', 'Zurück')} style={{ marginLeft: -10 }}
           onClick={() => (back === true ? navigate(-1) : navigate(back))}>
           <ChevronLeft size={26} />
         </button>

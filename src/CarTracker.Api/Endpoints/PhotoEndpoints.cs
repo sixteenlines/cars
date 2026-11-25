@@ -31,8 +31,8 @@ public static class PhotoEndpoints
             var vehicle = await db.Vehicles.FirstOrDefaultAsync(v => v.Id == vehicleId && v.OwnerId == userId, ct);
             if (vehicle is null) return Results.NotFound();
             if (entryId is not null && !await db.Entries.AnyAsync(e => e.Id == entryId && e.VehicleId == vehicleId, ct))
-                return Results.Problem("Entry not found on this vehicle.", statusCode: 400);
-            if (files.Count == 0) return Results.Problem("No files uploaded.", statusCode: 400);
+                return Loc.Problem("Entry not found on this vehicle.", "Eintrag bei diesem Auto nicht gefunden.", 400);
+            if (files.Count == 0) return Loc.Problem("No files uploaded.", "Keine Dateien hochgeladen.", 400);
 
             var saved = new List<Photo>();
             var failed = new List<string>();
@@ -92,7 +92,7 @@ public static class PhotoEndpoints
             var photo = await db.Photos.FirstOrDefaultAsync(ph => ph.Id == id && ph.OwnerId == p.UserId());
             if (photo is null) return Results.NotFound();
             if (req.EntryId is not null && !await db.Entries.AnyAsync(e => e.Id == req.EntryId && e.VehicleId == photo.VehicleId))
-                return Results.Problem("Entry not found on this vehicle.", statusCode: 400);
+                return Loc.Problem("Entry not found on this vehicle.", "Eintrag bei diesem Auto nicht gefunden.", 400);
             photo.Caption = req.Caption.Clean(300);
             photo.EntryId = req.EntryId;
             await db.SaveChangesAsync();

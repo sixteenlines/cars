@@ -9,14 +9,13 @@ import { TagInput } from '../components/TagInput'
 import { ConfirmButton, ErrorText, Field, Spinner, TopBar } from '../components/ui'
 import { fmtMoney, parseDecimal, parseIntOrNull, toInput, today } from '../format'
 import { keys, useEntries, useEntry, useVehicle } from '../hooks'
+import { kindLabel, t } from '../i18n'
 
 interface PartForm { key: string; name: string; brand: string; partNumber: string; quantity: string; unitPrice: string }
 
 const newPart = (): PartForm => ({ key: Math.random().toString(36).slice(2), name: '', brand: '', partNumber: '', quantity: '1', unitPrice: '' })
 
-const KINDS: { key: EntryKind; label: string }[] = [
-  { key: 'Mod', label: 'Mod' }, { key: 'Maintenance', label: 'Maintenance' }, { key: 'Expense', label: 'Expense' },
-]
+const KINDS: { key: EntryKind }[] = [{ key: 'Mod' }, { key: 'Maintenance' }, { key: 'Expense' }]
 
 export default function EntryForm() {
   const params = useParams()
@@ -54,9 +53,9 @@ export default function EntryForm() {
     setVendor(existing.vendor ?? ''); setTags(existing.tags); setNotes(existing.notes ?? '')
     setParts(existing.lineItems.map(l => ({
       key: String(l.id), name: l.name, brand: l.brand ?? '', partNumber: l.partNumber ?? '',
-      quantity: toInput(l.quantity), unitPrice: toInput(l.unitPrice),
+      quantity: toInput(l.quantity), unitPrice: toInput(l.unitPrice, 2),
     })))
-    setCost(toInput(existing.manualTotal))
+    setCost(toInput(existing.manualTotal, 2))
     setOverrideTotal(existing.lineItems.length > 0 && existing.manualTotal != null)
     setRelatedId(existing.relatedEntry?.id.toString() ?? '')
     setPhotos(existing.photos)
@@ -73,11 +72,11 @@ export default function EntryForm() {
   const save = useMutation({
     mutationFn: async () => {
       const manual = parts.length === 0 || overrideTotal ? parseDecimal(cost) : null
-      if (Number.isNaN(manual)) throw new Error('Cost is not a valid number.')
+      if (Number.isNaN(manual)) throw new Error(t('Cost is not a valid number.', 'Die Kosten sind keine gültige Zahl.'))
       const lineItems = parts.filter(p => p.name.trim()).map(p => {
         const quantity = parseDecimal(p.quantity) ?? 1
         const unitPrice = parseDecimal(p.unitPrice) ?? 0
-        if (Number.isNaN(quantity) || Number.isNaN(unitPrice)) throw new Error(`Check the numbers for “${p.name}”.`)
+        if (Number.isNaN(quantity) || Number.isNaN(unitPrice)) throw new Error(t(`Check the numbers for “${p.name}”.`, `Prüf die Zahlen bei „${p.name}“.`))
         return { name: p.name.trim(), brand: p.brand || null, partNumber: p.partNumber || null, quantity, unitPrice }
       })
       const body: EntryInput = {
@@ -121,41 +120,41 @@ export default function EntryForm() {
 
   return (
     <>
-      <TopBar back title={isEdit ? 'Edit entry' : `New entry · ${vehicle?.name ?? ''}`} />
+      <TopBar back title={isEdit ? t('Edit entry', 'Eintrag bearbeiten') : `${t('New entry', 'Neuer Eintrag')} · ${vehicle?.name ?? ''}`} />
       <form className="form" onSubmit={e => { e.preventDefault(); save.mutate() }}>
-        <div className="seg" role="radiogroup" aria-label="Kind">
+        <div className="seg" role="radiogroup" aria-label={t('Kind', 'Art')}>
           {KINDS.map(k => (
             <button type="button" key={k.key} role="radio" aria-checked={kind === k.key} className={kind === k.key ? 'on' : ''}
-              onClick={() => setKind(k.key)}>{k.label}</button>
+              onClick={() => setKind(k.key)}>{kindLabel(k.key)}</button>
           ))}
         </div>
         <div className="seg" role="radiogroup" aria-label="Status">
-          <button type="button" role="radio" aria-checked={status === 'Done'} className={status === 'Done' ? 'on' : ''} onClick={() => setStatus('Done')}>Done</button>
-          <button type="button" role="radio" aria-checked={status === 'Planned'} className={status === 'Planned' ? 'on' : ''} onClick={() => setStatus('Planned')}>Planned / wishlist</button>
+          <button type="button" role="radio" aria-checked={status === 'Done'} className={status === 'Done' ? 'on' : ''} onClick={() => setStatus('Done')}>{t('Done', 'Erledigt')}</button>
+          <button type="button" role="radio" aria-checked={status === 'Planned'} className={status === 'Planned' ? 'on' : ''} onClick={() => setStatus('Planned')}>{t('Planned / wishlist', 'Geplant / Wunschliste')}</button>
         </div>
 
         <div className="row" style={{ alignItems: 'flex-end', gap: 12 }}>
           <EntryIcon entry={{ kind, title, tags }} />
           <div className="grow">
-            <Field label="Title *">
+            <Field label={t('Title *', 'Titel *')}>
               <input required maxLength={200} value={title} onChange={e => setTitle(e.target.value)}
-                placeholder={kind === 'Mod' ? 'e.g. KW V3 coilovers' : kind === 'Maintenance' ? 'e.g. Oil change' : 'e.g. Insurance 2026'} />
+                placeholder={kind === 'Mod' ? t('e.g. KW V3 coilovers', 'z. B. KW V3 Gewindefahrwerk') : kind === 'Maintenance' ? t('e.g. Oil change', 'z. B. Ölwechsel') : t('e.g. Insurance 2026', 'z. B. Versicherung 2026')} />
             </Field>
           </div>
         </div>
 
         <div className="grid-2">
-          <Field label={kind === 'Expense' ? 'Date / from' : 'Date'}>
+          <Field label={kind === 'Expense' ? t('Date / from', 'Datum / ab') : t('Date', 'Datum')}>
             <input type="date" value={date} onChange={e => setDate(e.target.value)} />
           </Field>
           {kind === 'Expense'
-            ? <Field label="Until (optional)"><input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></Field>
-            : <Field label="Odometer (km)"><input inputMode="numeric" value={odometer} onChange={e => setOdometer(e.target.value)} /></Field>}
-          {kind === 'Expense' && <Field label="Odometer (km)"><input inputMode="numeric" value={odometer} onChange={e => setOdometer(e.target.value)} /></Field>}
-          <Field label="Shop / vendor"><input value={vendor} onChange={e => setVendor(e.target.value)} /></Field>
+            ? <Field label={t('Until (optional)', 'Bis (optional)')}><input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></Field>
+            : <Field label={t('Odometer (km)', 'km-Stand')}><input inputMode="numeric" value={odometer} onChange={e => setOdometer(e.target.value)} /></Field>}
+          {kind === 'Expense' && <Field label={t('Odometer (km)', 'km-Stand')}><input inputMode="numeric" value={odometer} onChange={e => setOdometer(e.target.value)} /></Field>}
+          <Field label={t('Shop / vendor', 'Werkstatt / Händler')}><input value={vendor} onChange={e => setVendor(e.target.value)} /></Field>
           {(parts.length === 0 || overrideTotal) && (
-            <Field label={parts.length ? 'Total (€)' : 'Cost (€)'}>
-              <input inputMode="decimal" value={cost} onChange={e => setCost(e.target.value)} placeholder="0,00" />
+            <Field label={parts.length ? t('Total (€)', 'Summe (€)') : t('Cost (€)', 'Kosten (€)')}>
+              <input inputMode="decimal" value={cost} onChange={e => setCost(e.target.value)} placeholder={t('0.00', '0,00')} />
             </Field>
           )}
         </div>
@@ -163,43 +162,43 @@ export default function EntryForm() {
         <Field label="Tags"><TagInput value={tags} onChange={setTags} /></Field>
 
         <div className="stack" style={{ gap: 8 }}>
-          <div className="row"><h2 className="grow">Parts</h2><span className="faint">optional</span></div>
+          <div className="row"><h2 className="grow">{t('Parts', 'Teile')}</h2><span className="faint">optional</span></div>
           {parts.map((p, i) => (
             <div key={p.key} className="card part">
               <div className="part-head full">
-                <strong className="grow faint">Part {i + 1}</strong>
-                <button type="button" className="icon-btn" aria-label="Remove part" onClick={() => setParts(ps => ps.filter(x => x.key !== p.key))}><Trash2 size={18} /></button>
+                <strong className="grow faint">{t('Part', 'Teil')} {i + 1}</strong>
+                <button type="button" className="icon-btn" aria-label={t('Remove part', 'Teil entfernen')} onClick={() => setParts(ps => ps.filter(x => x.key !== p.key))}><Trash2 size={18} /></button>
               </div>
-              <label className="field full"><span>Name</span><input value={p.name} onChange={e => updatePart(p.key, { name: e.target.value })} /></label>
-              <label className="field"><span>Brand</span><input value={p.brand} onChange={e => updatePart(p.key, { brand: e.target.value })} /></label>
-              <label className="field"><span>Part no.</span><input value={p.partNumber} onChange={e => updatePart(p.key, { partNumber: e.target.value })} /></label>
-              <label className="field"><span>Qty</span><input inputMode="decimal" value={p.quantity} onChange={e => updatePart(p.key, { quantity: e.target.value })} /></label>
-              <label className="field"><span>Unit price (€)</span><input inputMode="decimal" value={p.unitPrice} onChange={e => updatePart(p.key, { unitPrice: e.target.value })} /></label>
+              <label className="field full"><span>{t('Name', 'Bezeichnung')}</span><input value={p.name} onChange={e => updatePart(p.key, { name: e.target.value })} /></label>
+              <label className="field"><span>{t('Brand', 'Marke')}</span><input value={p.brand} onChange={e => updatePart(p.key, { brand: e.target.value })} /></label>
+              <label className="field"><span>{t('Part no.', 'Teilenr.')}</span><input value={p.partNumber} onChange={e => updatePart(p.key, { partNumber: e.target.value })} /></label>
+              <label className="field"><span>{t('Qty', 'Menge')}</span><input inputMode="decimal" value={p.quantity} onChange={e => updatePart(p.key, { quantity: e.target.value })} /></label>
+              <label className="field"><span>{t('Unit price (€)', 'Stückpreis (€)')}</span><input inputMode="decimal" value={p.unitPrice} onChange={e => updatePart(p.key, { unitPrice: e.target.value })} /></label>
             </div>
           ))}
-          <button type="button" className="btn" onClick={() => setParts(ps => [...ps, newPart()])}><Plus size={18} /> Add part</button>
+          <button type="button" className="btn" onClick={() => setParts(ps => [...ps, newPart()])}><Plus size={18} /> {t('Add part', 'Teil hinzufügen')}</button>
           {parts.length > 0 && (
             <>
-              <div className="totals"><span>Parts total</span><span>{fmtMoney(partsSum)}</span></div>
+              <div className="totals"><span>{t('Parts total', 'Summe Teile')}</span><span>{fmtMoney(partsSum)}</span></div>
               <label className="check">
                 <input type="checkbox" checked={overrideTotal} onChange={e => setOverrideTotal(e.target.checked)} />
-                Use a different total (shipping, discount…)
+                {t('Use a different total (shipping, discount…)', 'Andere Summe verwenden (Versand, Rabatt…)')}
               </label>
             </>
           )}
         </div>
 
-        <Field label="Belongs to" hint="E.g. link an installation to the mod it was for.">
+        <Field label={t('Belongs to', 'Gehört zu')} hint={t('E.g. link an installation to the mod it was for.', 'Z. B. den Einbau mit der passenden Mod verknüpfen.')}>
           <select value={relatedId} onChange={e => setRelatedId(e.target.value)}>
             <option value="">—</option>
             {siblings.filter(s => s.id !== entryId).map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
           </select>
         </Field>
 
-        <Field label="Notes"><textarea value={notes} onChange={e => setNotes(e.target.value)} /></Field>
+        <Field label={t('Notes', 'Notizen')}><textarea value={notes} onChange={e => setNotes(e.target.value)} /></Field>
 
         <div className="stack" style={{ gap: 8 }}>
-          <h2>Photos</h2>
+          <h2>{t('Photos', 'Fotos')}</h2>
           <PhotoGrid photos={photos} pending={pending}
             onAdd={items => setPending(ps => [...ps, ...items])}
             onRemovePending={key => setPending(ps => ps.filter(p => p.key !== key))}
@@ -208,12 +207,12 @@ export default function EntryForm() {
 
         <ErrorText error={save.error ?? remove.error} />
         {isEdit && (
-          <ConfirmButton onConfirm={() => remove.mutate()} confirmLabel="Tap again to delete (photos stay in the gallery)">Delete entry</ConfirmButton>
+          <ConfirmButton onConfirm={() => remove.mutate()} confirmLabel={t('Tap again to delete (photos stay in the gallery)', 'Nochmal tippen zum Löschen (Fotos bleiben in der Galerie)')}>{t('Delete entry', 'Eintrag löschen')}</ConfirmButton>
         )}
         <div className="form-actions">
-          <button type="button" className="btn" onClick={() => navigate(-1)}>Cancel</button>
+          <button type="button" className="btn" onClick={() => navigate(-1)}>{t('Cancel', 'Abbrechen')}</button>
           <button className="btn btn-primary" disabled={save.isPending}>
-            {save.isPending ? <><Spinner size={18} /> {pending.length ? 'Uploading…' : 'Saving…'}</> : 'Save'}
+            {save.isPending ? <><Spinner size={18} /> {pending.length ? t('Uploading…', 'Lädt hoch…') : t('Saving…', 'Speichert…')}</> : t('Save', 'Speichern')}
           </button>
         </div>
       </form>

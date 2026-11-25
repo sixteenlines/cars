@@ -23,7 +23,7 @@ public class PhotoService(StorageOptions storage)
         }
         catch (MagickException ex)
         {
-            throw new InvalidImageException("Unsupported or corrupt image.", ex);
+            throw new InvalidImageException(Loc.T("Unsupported or corrupt image.", "Nicht unterstütztes oder beschädigtes Bild."), ex);
         }
 
         var takenAt = ReadTakenAt(image);

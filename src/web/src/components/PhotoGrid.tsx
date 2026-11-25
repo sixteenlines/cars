@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, ImagePlus, Star, Trash2, X } from 'lucide-re
 import { useEffect, useRef, useState } from 'react'
 import { photoUrl, type Photo } from '../api'
 import { ConfirmButton, Spinner } from './ui'
+import { t } from '../i18n'
 
 export interface PendingPhoto { key: string; file: File; preview: string }
 
@@ -23,7 +24,7 @@ interface Props {
 }
 
 /** Photo grid with an add tile: tap → iOS offers library/camera/files; desktop also supports drag & drop. */
-export function PhotoGrid({ photos, pending = [], uploading, coverId, onAdd, onRemovePending, onDelete, onSetCover, addLabel = 'Add photos' }: Props) {
+export function PhotoGrid({ photos, pending = [], uploading, coverId, onAdd, onRemovePending, onDelete, onSetCover, addLabel = t('Add photos', 'Fotos hinzufügen') }: Props) {
   const input = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)
   const [open, setOpen] = useState<number | null>(null)
@@ -41,20 +42,20 @@ export function PhotoGrid({ photos, pending = [], uploading, coverId, onAdd, onR
       <div className="photo-grid">
         <button type="button" className={`drop ${over ? 'over' : ''}`} onClick={() => input.current?.click()}>
           {uploading ? <Spinner /> : <ImagePlus size={26} />}
-          {uploading ? 'Uploading…' : addLabel}
+          {uploading ? t('Uploading…', 'Lädt hoch…') : addLabel}
         </button>
         {pending.map(p => (
           <div key={p.key} className="ph pending">
             <img src={p.preview} alt="" onError={e => ((e.target as HTMLImageElement).style.visibility = 'hidden')} />
             {onRemovePending && !uploading && (
-              <button type="button" className="x" aria-label="Remove" onClick={() => onRemovePending(p.key)}><X size={16} /></button>
+              <button type="button" className="x" aria-label={t('Remove', 'Entfernen')} onClick={() => onRemovePending(p.key)}><X size={16} /></button>
             )}
           </div>
         ))}
         {photos.map((p, i) => (
           <button type="button" key={p.id} className="ph" onClick={() => setOpen(i)}>
             <img src={photoUrl(p.id)} alt={p.caption ?? ''} loading="lazy" />
-            {coverId === p.id && <span className="cover-badge">Cover</span>}
+            {coverId === p.id && <span className="cover-badge">{t('Cover', 'Titelbild')}</span>}
           </button>
         ))}
       </div>
@@ -98,21 +99,21 @@ function Lightbox({ photos, index, onIndex, onClose, coverId, onDelete, onSetCov
         touchX.current = null
       }}>
       <div className="bar">
-        <button className="icon-btn" aria-label="Close" onClick={onClose}><X size={24} /></button>
+        <button className="icon-btn" aria-label={t('Close', 'Schließen')} onClick={onClose}><X size={24} /></button>
         <span className="grow" style={{ fontSize: '.9rem', opacity: .8 }}>{index + 1} / {photos.length}</span>
         {onSetCover && coverId !== photo.id && (
-          <button className="btn" onClick={() => onSetCover(photo)}><Star size={16} /> Cover</button>
+          <button className="btn" onClick={() => onSetCover(photo)}><Star size={16} /> {t('Cover', 'Titelbild')}</button>
         )}
         {onDelete && (
-          <ConfirmButton className="btn" ariaLabel="Delete photo" onConfirm={() => { onDelete(photo); onClose() }}
-            confirmLabel={<><Trash2 size={16} /> Delete?</>}><Trash2 size={16} /></ConfirmButton>
+          <ConfirmButton className="btn" ariaLabel={t('Delete photo', 'Foto löschen')} onConfirm={() => { onDelete(photo); onClose() }}
+            confirmLabel={<><Trash2 size={16} /> {t('Delete?', 'Löschen?')}</>}><Trash2 size={16} /></ConfirmButton>
         )}
       </div>
       <img src={photoUrl(photo.id, 'full')} alt={photo.caption ?? ''} />
       {photos.length > 1 && (
         <div className="bar" style={{ justifyContent: 'space-between', paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}>
-          <button className="icon-btn" aria-label="Previous" onClick={prev}><ChevronLeft size={28} /></button>
-          <button className="icon-btn" aria-label="Next" onClick={next}><ChevronRight size={28} /></button>
+          <button className="icon-btn" aria-label={t('Previous', 'Zurück')} onClick={prev}><ChevronLeft size={28} /></button>
+          <button className="icon-btn" aria-label={t('Next', 'Weiter')} onClick={next}><ChevronRight size={28} /></button>
         </div>
       )}
     </div>

@@ -1,9 +1,10 @@
 // Thin typed client for the ASP.NET Core API. Cookies carry the session (same origin).
+import { getLang, t } from './i18n'
 
 export type EntryKind = 'Mod' | 'Maintenance' | 'Expense'
 export type EntryStatus = 'Planned' | 'Done'
 
-export interface Me { id: string; email: string; displayName: string; isAdmin: boolean }
+export interface Me { id: string; email: string; displayName: string; isAdmin: boolean; language: 'en' | 'de' | null }
 
 export interface VehicleStats {
   totalSpent: number; modsTotal: number; maintenanceTotal: number; expensesTotal: number; plannedTotal: number
@@ -62,7 +63,8 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const init: RequestInit = { method, credentials: 'same-origin', headers: {} }
+  // Accept-Language: the server answers errors and warnings in the app's language.
+  const init: RequestInit = { method, credentials: 'same-origin', headers: { 'Accept-Language': getLang() } }
   if (body instanceof FormData) {
     init.body = body
   } else if (body !== undefined) {
@@ -71,12 +73,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   }
   const res = await fetch(`/api${path}`, init)
   if (!res.ok) {
-    let message = res.statusText || `Request failed (${res.status})`
+    let message = res.statusText || t(`Request failed (${res.status})`, `Anfrage fehlgeschlagen (${res.status})`)
     try {
       const problem = await res.json()
       message = problem.detail ?? problem.title ?? message
     } catch { /* not JSON */ }
-    if (res.status === 429) message = 'Too many attempts. Please wait a minute.'
+    if (res.status === 429) message = t('Too many attempts. Please wait a minute.', 'Zu viele Versuche. Warte bitte eine Minute.')
     throw new ApiError(res.status, message)
   }
   if (res.status === 204) return undefined as T
@@ -164,7 +166,7 @@ export const FUEL_GRADES: { value: FuelGrade; label: string }[] = [
   { value: '95', label: '95' }, { value: '98', label: '98' }, { value: '100', label: '100' },
   { value: '102', label: '102' }, { value: 'diesel', label: 'Diesel' },
 ]
-export const gradeLabel = (g: string | null) => (g == null ? '' : g === 'diesel' ? 'Diesel' : `ROZ ${g}`)
+export const gradeLabel = (g: string | null) => (g == null ? '' : g === 'diesel' ? 'Diesel' : t(`RON ${g}`, `ROZ ${g}`))
 
 export interface FuelUp {
   id: number; vehicleId: number; date: string; odometer: number | null; grade: FuelGrade | null

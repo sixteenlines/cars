@@ -6,15 +6,16 @@ import { api, FUEL_GRADES, gradeLabel, photoUrl, uploadPhotos, type FuelUp, type
 import { EntryRow } from '../components/EntryRow'
 import { PhotoGrid, type PendingPhoto } from '../components/PhotoGrid'
 import { Empty, ErrorText, Spinner, TopBar } from '../components/ui'
-import { fmtDate, fmtKm, fmtMoney, fmtMoneyShort } from '../format'
+import { fmtDate, fmtKm, fmtMoney, fmtMoneyShort, fmtNum } from '../format'
 import { keys, useEntries, useFuel, usePhotos, useVehicle } from '../hooks'
+import { plural, t } from '../i18n'
 
 const FILTERS = [
-  { key: 'all', label: 'All' },
-  { key: 'Mod', label: 'Mods' },
-  { key: 'Maintenance', label: 'Maintenance' },
-  { key: 'Expense', label: 'Expenses' },
-  { key: 'planned', label: 'Planned' },
+  { key: 'all', label: () => t('All', 'Alle') },
+  { key: 'Mod', label: () => 'Mods' },
+  { key: 'Maintenance', label: () => t('Maintenance', 'Wartung') },
+  { key: 'Expense', label: () => t('Expenses', 'Ausgaben') },
+  { key: 'planned', label: () => t('Planned', 'Geplant') },
 ] as const
 type FilterKey = (typeof FILTERS)[number]['key']
 
@@ -25,21 +26,21 @@ export default function VehicleDetail() {
   const tab = params.get('tab') === 'photos' ? 'photos' : params.get('tab') === 'fuel' ? 'fuel' : 'entries'
 
   if (isLoading) return <div className="center"><Spinner /></div>
-  if (!v) return <><TopBar back="/" title="Not found" /><Empty title="This car doesn't exist (anymore)." /></>
+  if (!v) return <><TopBar back="/" title={t('Not found', 'Nicht gefunden')} /><Empty title={t("This car doesn't exist (anymore).", 'Dieses Auto gibt es nicht (mehr).')} /></>
 
   return (
     <>
       <TopBar back="/" title={v.name}>
-        <Link to={`/vehicles/${v.id}/fuel/new`} className="icon-btn" aria-label="Add fill-up"><Fuel size={20} /></Link>
-        <Link to={`/import?vehicleId=${v.id}`} className="icon-btn" aria-label="Import bill"><FileUp size={20} /></Link>
-        <Link to={`/vehicles/${v.id}/edit`} className="icon-btn" aria-label="Edit car"><Pencil size={20} /></Link>
+        <Link to={`/vehicles/${v.id}/fuel/new`} className="icon-btn" aria-label={t('Add fill-up', 'Tanken eintragen')}><Fuel size={20} /></Link>
+        <Link to={`/import?vehicleId=${v.id}`} className="icon-btn" aria-label={t('Import bill', 'Rechnung importieren')}><FileUp size={20} /></Link>
+        <Link to={`/vehicles/${v.id}/edit`} className="icon-btn" aria-label={t('Edit car', 'Auto bearbeiten')}><Pencil size={20} /></Link>
       </TopBar>
 
       <div className="hero">
         {v.coverPhotoId
           ? <img src={photoUrl(v.coverPhotoId, 'full')} alt="" />
           : <button className="placeholder btn-ghost" style={{ border: 0, cursor: 'pointer' }} onClick={() => setParams({ tab: 'photos' })}>
-              <div><Car size={56} /><div className="faint">Add a photo</div></div>
+              <div><Car size={56} /><div className="faint">{t('Add a photo', 'Foto hinzufügen')}</div></div>
             </button>}
       </div>
 
@@ -55,13 +56,13 @@ export default function VehicleDetail() {
 
       <div className="tabs" role="tablist">
         <button role="tab" className={tab === 'entries' ? 'on' : ''} onClick={() => setParams({}, { replace: true })}>
-          Entries ({v.stats.entryCount})
+          {t('Entries', 'Einträge')} ({v.stats.entryCount})
         </button>
         <button role="tab" className={tab === 'fuel' ? 'on' : ''} onClick={() => setParams({ tab: 'fuel' }, { replace: true })}>
-          Fuel ({v.stats.fuelCount})
+          {t('Fuel', 'Tanken')} ({v.stats.fuelCount})
         </button>
         <button role="tab" className={tab === 'photos' ? 'on' : ''} onClick={() => setParams({ tab: 'photos' }, { replace: true })}>
-          Photos ({v.stats.photoCount})
+          {t('Photos', 'Fotos')} ({v.stats.photoCount})
         </button>
       </div>
 
@@ -74,23 +75,23 @@ function Stats({ v }: { v: Vehicle }) {
   const s = v.stats
   return (
     <div className="stats">
-      <div className="card stat"><div className="k">Total spent</div><div className="v">{fmtMoneyShort(s.totalSpent)}</div></div>
-      <div className="card stat"><div className="k">Mods</div><div className="v">{fmtMoneyShort(s.modsTotal)}</div><div className="faint">{s.modCount} done</div></div>
-      <div className="card stat"><div className="k">Maintenance</div><div className="v">{fmtMoneyShort(s.maintenanceTotal)}</div><div className="faint">last {fmtDate(s.lastMaintenanceDate)}</div></div>
+      <div className="card stat"><div className="k">{t('Total spent', 'Gesamtkosten')}</div><div className="v">{fmtMoneyShort(s.totalSpent)}</div></div>
+      <div className="card stat"><div className="k">Mods</div><div className="v">{fmtMoneyShort(s.modsTotal)}</div><div className="faint">{s.modCount} {t('done', 'erledigt')}</div></div>
+      <div className="card stat"><div className="k">{t('Maintenance', 'Wartung')}</div><div className="v">{fmtMoneyShort(s.maintenanceTotal)}</div><div className="faint">{t('last', 'zuletzt')} {fmtDate(s.lastMaintenanceDate)}</div></div>
       {s.fuelCount > 0 && (
-        <div className="card stat"><div className="k">Fuel</div><div className="v">{fmtMoneyShort(s.fuelTotal)}</div>
-          <div className="faint">{s.avgConsumption != null ? `Ø ${fmtL100(s.avgConsumption)}` : `${s.fuelCount} fill-ups`}</div></div>
+        <div className="card stat"><div className="k">{t('Fuel', 'Sprit')}</div><div className="v">{fmtMoneyShort(s.fuelTotal)}</div>
+          <div className="faint">{s.avgConsumption != null ? `Ø ${fmtL100(s.avgConsumption)}` : plural(s.fuelCount, ['fill-up', 'Tankfüllung'], ['fill-ups', 'Tankfüllungen'])}</div></div>
       )}
       {s.plannedCount > 0 && (
-        <div className="card stat"><div className="k">Planned</div><div className="v">{fmtMoneyShort(s.plannedTotal)}</div><div className="faint">{s.plannedCount} items</div></div>
+        <div className="card stat"><div className="k">{t('Planned', 'Geplant')}</div><div className="v">{fmtMoneyShort(s.plannedTotal)}</div><div className="faint">{plural(s.plannedCount, ['item', 'Eintrag'], ['items', 'Einträge'])}</div></div>
       )}
     </div>
   )
 }
 
-const fmtL100 = (n: number) => `${n.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} L/100 km`
-const fmtL = (n: number | null) => (n == null ? '–' : `${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L`)
-const fmtPpl = (n: number | null) => (n == null ? '' : `${n.toLocaleString('de-DE', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} €/L`)
+const fmtL100 = (n: number) => `${fmtNum(n, 1)} L/100 km`
+const fmtL = (n: number | null) => (n == null ? '–' : `${fmtNum(n, 2)} L`)
+const fmtPpl = (n: number | null) => (n == null ? '' : `${fmtNum(n, 3)} €/L`)
 
 function FuelTab({ vehicle }: { vehicle: Vehicle }) {
   const { data: log, isLoading } = useFuel(vehicle.id)
@@ -102,31 +103,31 @@ function FuelTab({ vehicle }: { vehicle: Vehicle }) {
     <>
       {log.fuelUps.length === 0 ? (
         <div className="card">
-          <Empty icon={<Fuel size={36} />} title="No fill-ups yet">
-            <p>Pick the grade, type the total and price per litre, or snap the pump display.</p>
-            <Link to={`/vehicles/${vehicle.id}/fuel/new`} className="btn btn-primary"><Plus size={18} /> Add fill-up</Link>
+          <Empty icon={<Fuel size={36} />} title={t('No fill-ups yet', 'Noch nicht getankt')}>
+            <p>{t('Pick the grade, type the total and price per litre, or snap the pump display.', 'Sorte wählen, Betrag und Literpreis eintippen – oder einfach die Zapfsäule fotografieren.')}</p>
+            <Link to={`/vehicles/${vehicle.id}/fuel/new`} className="btn btn-primary"><Plus size={18} /> {t('Add fill-up', 'Tanken eintragen')}</Link>
           </Empty>
         </div>
       ) : (
         <>
           <div className="stats" style={{ marginBottom: 12 }}>
-            <div className="card stat"><div className="k">Consumption</div>
+            <div className="card stat"><div className="k">{t('Consumption', 'Verbrauch')}</div>
               <div className="v">{s.avgConsumption != null ? fmtL100(s.avgConsumption) : '–'}</div>
-              <div className="faint">{s.distanceKm ? `over ${fmtKm(s.distanceKm)}` : 'needs 2 full tanks with km'}</div></div>
-            <div className="card stat"><div className="k">Cost / 100 km</div>
+              <div className="faint">{s.distanceKm ? t(`over ${fmtKm(s.distanceKm)}`, `über ${fmtKm(s.distanceKm)}`) : t('needs 2 full tanks with km', 'braucht 2 volle Tankfüllungen mit km')}</div></div>
+            <div className="card stat"><div className="k">{t('Cost / 100 km', 'Kosten / 100 km')}</div>
               <div className="v">{s.costPer100Km != null ? fmtMoney(s.costPer100Km) : '–'}</div></div>
-            <div className="card stat"><div className="k">This month</div><div className="v">{fmtMoneyShort(s.thisMonthCost)}</div>
-              <div className="faint">{fmtMoneyShort(s.thisYearCost)} this year</div></div>
-            <div className="card stat"><div className="k">Ø price / L</div>
+            <div className="card stat"><div className="k">{t('This month', 'Diesen Monat')}</div><div className="v">{fmtMoneyShort(s.thisMonthCost)}</div>
+              <div className="faint">{fmtMoneyShort(s.thisYearCost)} {t('this year', 'dieses Jahr')}</div></div>
+            <div className="card stat"><div className="k">{t('Ø price / L', 'Ø Preis / L')}</div>
               {ppl.length === 0 ? <div className="v">–</div> : ppl.map(g => (
                 <div key={g.value} className="ppl-row"><span className="faint">{g.label}</span><span>{fmtPpl(s.avgPricePerLiter[g.value])}</span></div>
               ))}</div>
           </div>
           <div className="card list">{log.fuelUps.map(f => <FuelRow key={f.id} f={f} />)}</div>
-          <div className="totals faint"><span>{s.count} fill-ups · {fmtL(s.totalLiters)}</span><span>{fmtMoneyShort(s.totalCost)}</span></div>
+          <div className="totals faint"><span>{plural(s.count, ['fill-up', 'Tankfüllung'], ['fill-ups', 'Tankfüllungen'])} · {fmtL(s.totalLiters)}</span><span>{fmtMoneyShort(s.totalCost)}</span></div>
         </>
       )}
-      <Link to={`/vehicles/${vehicle.id}/fuel/new`} className="fab"><Plus size={22} /> Fuel</Link>
+      <Link to={`/vehicles/${vehicle.id}/fuel/new`} className="fab"><Plus size={22} /> {t('Fuel', 'Tanken')}</Link>
     </>
   )
 }
@@ -138,13 +139,13 @@ function FuelRow({ f }: { f: FuelUp }) {
       <div className="main">
         <div className="t">{fmtL(f.liters)}{f.pricePerLiter != null && <span className="faint"> · {fmtPpl(f.pricePerLiter)}</span>}</div>
         <div className="s">
-          {fmtDate(f.date)}{f.odometer != null && ` · ${fmtKm(f.odometer)}`}{f.station && ` · ${f.station}`}{!f.fullTank && ' · partial'}
+          {fmtDate(f.date)}{f.odometer != null && ` · ${fmtKm(f.odometer)}`}{f.station && ` · ${f.station}`}{!f.fullTank && ` · ${t('partial', 'Teilfüllung')}`}
         </div>
       </div>
       <div className="amount">
         <div>{fmtMoney(f.total)}</div>
         {f.consumption != null && (
-          <div className={`faint ${f.consumptionPlausible ? '' : 'error'}`} title={`${fmtKm(f.distanceKm)} since last full tank`}>
+          <div className={`faint ${f.consumptionPlausible ? '' : 'error'}`} title={t(`${fmtKm(f.distanceKm)} since last full tank`, `${fmtKm(f.distanceKm)} seit dem letzten Volltanken`)}>
             {fmtL100(f.consumption)}{f.consumptionPlausible ? '' : ' ?'}
           </div>
         )}
@@ -182,11 +183,11 @@ function EntriesTab({ vehicle }: { vehicle: Vehicle }) {
       <div className="stack" style={{ gap: 10, marginBottom: 12 }}>
         <label className="field search">
           <Search size={18} />
-          <input type="search" placeholder="Search title, part number, shop…" value={q} onChange={e => setQ(e.target.value)} />
+          <input type="search" placeholder={t('Search title, part number, shop…', 'Titel, Teilenummer, Werkstatt suchen…')} value={q} onChange={e => setQ(e.target.value)} />
         </label>
         <div className="chips">
           {FILTERS.map(f => (
-            <button key={f.key} className={`chip ${filter === f.key ? 'active' : ''}`} onClick={() => setFilter(f.key)}>{f.label}</button>
+            <button key={f.key} className={`chip ${filter === f.key ? 'active' : ''}`} onClick={() => setFilter(f.key)}>{f.label()}</button>
           ))}
         </div>
         {tags.length > 0 && (
@@ -201,21 +202,21 @@ function EntriesTab({ vehicle }: { vehicle: Vehicle }) {
       {isLoading && <div className="center"><Spinner /></div>}
       {entries && (visible.length === 0 ? (
         <div className="card">
-          <Empty icon={<ListPlus size={36} />} title={entries.length ? 'Nothing matches' : 'No entries yet'}>
+          <Empty icon={<ListPlus size={36} />} title={entries.length ? t('Nothing matches', 'Nichts gefunden') : t('No entries yet', 'Noch keine Einträge')}>
             {!entries.length && <>
-              <p>Add a mod or repair — or import a bill and let it fill in the parts.</p>
-              <Link to={`/import?vehicleId=${vehicle.id}`} className="btn btn-primary"><FileUp size={18} /> Import bill</Link>
+              <p>{t('Add a mod or repair — or import a bill and let it fill in the parts.', 'Trag eine Mod oder Reparatur ein – oder importier eine Rechnung, dann werden die Teile automatisch ausgefüllt.')}</p>
+              <Link to={`/import?vehicleId=${vehicle.id}`} className="btn btn-primary"><FileUp size={18} /> {t('Import bill', 'Rechnung importieren')}</Link>
             </>}
           </Empty>
         </div>
       ) : (
         <>
           <div className="card list">{visible.map(e => <EntryRow key={e.id} entry={e} />)}</div>
-          <div className="totals faint"><span>{visible.length} entries</span><span>{fmtMoneyShort(sum)}</span></div>
+          <div className="totals faint"><span>{plural(visible.length, ['entry', 'Eintrag'], ['entries', 'Einträge'])}</span><span>{fmtMoneyShort(sum)}</span></div>
         </>
       ))}
 
-      <Link to={`/vehicles/${vehicle.id}/entries/new?kind=${newKind}`} className="fab"><Plus size={22} /> Entry</Link>
+      <Link to={`/vehicles/${vehicle.id}/entries/new?kind=${newKind}`} className="fab"><Plus size={22} /> {t('Entry', 'Eintrag')}</Link>
     </>
   )
 }
@@ -236,7 +237,7 @@ function PhotosTab({ vehicle }: { vehicle: Vehicle }) {
   const upload = useMutation({
     mutationFn: (items: PendingPhoto[]) => uploadPhotos(vehicle.id, items.map(p => p.file)),
     onSuccess: res => {
-      setError(res.failed.length ? `Couldn't upload: ${res.failed.join(', ')}` : null)
+      setError(res.failed.length ? t(`Couldn't upload: ${res.failed.join(', ')}`, `Hochladen fehlgeschlagen: ${res.failed.join(', ')}`) : null)
       setPending([])
       refresh()
     },
@@ -263,7 +264,7 @@ function PhotosTab({ vehicle }: { vehicle: Vehicle }) {
       />
       {error && <p className="error">{error}</p>}
       <ErrorText error={upload.error ?? setCover.error ?? del.error} />
-      {photos.length === 0 && !pending.length && <p className="faint" style={{ marginTop: 12 }}>Photos attached to entries show up here too.</p>}
+      {photos.length === 0 && !pending.length && <p className="faint" style={{ marginTop: 12 }}>{t('Photos attached to entries show up here too.', 'Fotos aus Einträgen erscheinen auch hier.')}</p>}
     </>
   )
 }

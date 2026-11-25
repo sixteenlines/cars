@@ -36,12 +36,12 @@ public static class DocumentEndpoints
             DocumentStorage storage, ExtractionQueue queue, AiOptions ai, CancellationToken ct) =>
         {
             var userId = p.UserId();
-            if (file.Length is 0 or > MaxFileBytes) return Results.Problem("File is empty or larger than 25 MB.", statusCode: 400);
+            if (file.Length is 0 or > MaxFileBytes) return Loc.Problem("File is empty or larger than 25 MB.", "Die Datei ist leer oder größer als 25 MB.", 400);
             var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
             if (ext.Length > 0 && !DocumentStorage.AllowedExtensions.Contains(ext))
-                return Results.Problem("Please upload a PDF or a photo (JPG, PNG, HEIC).", statusCode: 400);
+                return Loc.Problem("Please upload a PDF or a photo (JPG, PNG, HEIC).", "Bitte lade ein PDF oder ein Foto hoch (JPG, PNG, HEIC).", 400);
             if (vehicleId is not null && !await db.Vehicles.AnyAsync(v => v.Id == vehicleId && v.OwnerId == userId, ct))
-                return Results.Problem("Vehicle not found.", statusCode: 400);
+                return Loc.Problem("Vehicle not found.", "Auto nicht gefunden.", 400);
 
             byte[] bytes;
             using (var ms = new MemoryStream())
@@ -61,7 +61,8 @@ public static class DocumentEndpoints
                 var monthStart = new DateTimeOffset(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
                 var used = await db.Documents.CountAsync(d => d.OwnerId == userId && d.AiCalled && d.CreatedAt >= monthStart, ct);
                 if (used >= ai.MonthlyLimitPerUser)
-                    return Results.Problem($"You've reached this month's limit of {ai.MonthlyLimitPerUser} bill imports. Ask the admin.", statusCode: 429);
+                    return Loc.Problem($"You've reached this month's limit of {ai.MonthlyLimitPerUser} bill imports. Ask the admin.",
+                        $"Du hast das Monatslimit von {ai.MonthlyLimitPerUser} Rechnungsimporten erreicht. Frag den Admin.", 429);
             }
 
             DocumentStorage.Stored stored;
@@ -114,7 +115,7 @@ public static class DocumentEndpoints
         {
             var doc = await db.Documents.FirstOrDefaultAsync(d => d.Id == id && d.OwnerId == p.UserId());
             if (doc is null) return Results.NotFound();
-            if (doc.Status == DocumentStatus.Imported) return Results.Problem("Already imported.", statusCode: 400);
+            if (doc.Status == DocumentStatus.Imported) return Loc.Problem("Already imported.", "Schon importiert.", 400);
             doc.Status = DocumentStatus.Processing;
             doc.Error = null;
             await db.SaveChangesAsync();
@@ -128,12 +129,12 @@ public static class DocumentEndpoints
             var userId = p.UserId();
             var doc = await db.Documents.FirstOrDefaultAsync(d => d.Id == id && d.OwnerId == userId);
             if (doc is null) return Results.NotFound();
-            if (doc.Status == DocumentStatus.Processing) return Results.Problem("The bill is still being read.", statusCode: 409);
-            if (req.Entries is not { Count: > 0 } || req.Entries.Count > 100) return Results.Problem("Nothing to import.", statusCode: 400);
+            if (doc.Status == DocumentStatus.Processing) return Loc.Problem("The bill is still being read.", "Die Rechnung wird noch gelesen.", 409);
+            if (req.Entries is not { Count: > 0 } || req.Entries.Count > 100) return Loc.Problem("Nothing to import.", "Nichts zum Importieren.", 400);
 
             var vehicleIds = req.Entries.Select(e => e.VehicleId).Distinct().ToList();
             var owned = await db.Vehicles.CountAsync(v => vehicleIds.Contains(v.Id) && v.OwnerId == userId);
-            if (owned != vehicleIds.Count) return Results.Problem("Vehicle not found.", statusCode: 400);
+            if (owned != vehicleIds.Count) return Loc.Problem("Vehicle not found.", "Auto nicht gefunden.", 400);
 
             var created = new List<Entry>();
             foreach (var item in req.Entries)

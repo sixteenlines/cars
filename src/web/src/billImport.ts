@@ -1,6 +1,7 @@
 // Pure logic for turning a reviewed bill into entries. No React here, so it's easy to test.
 import type { BillExtraction, EntryKind, EntryStatus, ImportEntry, LineType, Purpose } from './api'
-import { parseDecimal } from './format'
+import { parseDecimal, toInput } from './format'
+import { t } from './i18n'
 
 export type SplitMode = 'single' | 'category' | 'item'
 
@@ -70,11 +71,11 @@ export function initialState(x: BillExtraction | null, vehicleId: number | null)
     const unit = Math.abs(qty * l.unit_price - l.total) > 0.01 ? l.total / qty : l.unit_price
     return {
       key: `l${i}`, include: true, name: l.name, shortName: l.short_name?.trim() || '', brand: l.brand ?? '', partNumber: l.part_number ?? '',
-      quantity: String(qty).replace('.', ','), unitPrice: unit.toFixed(2).replace('.', ','),
+      quantity: toInput(qty), unitPrice: toInput(unit, 2),
       lineType: l.line_type, category: l.category, purpose: l.purpose ?? 'repair',
     }
   })
-  const notes = [x?.invoice_number ? `Invoice ${x.invoice_number}` : null, x?.notes].filter(Boolean).join(' · ')
+  const notes = [x?.invoice_number ? `${t('Invoice', 'Rechnung')} ${x.invoice_number}` : null, x?.notes].filter(Boolean).join(' · ')
   return {
     vehicleId, date: x?.invoice_date ?? '', vendor: x?.vendor ?? '', odometer: x?.odometer_km?.toString() ?? '',
     status: 'Done', mode: 'category', spreadExtras: true, tags: [], notes, lines, titles: {}, kinds: {},
@@ -90,11 +91,11 @@ function groupKey(mode: SplitMode, l: ReviewLine) {
 const titleOf = (l: ReviewLine) => l.shortName || l.name
 
 function defaultTitle(lines: ReviewLine[], vendor: string) {
-  if (lines.length === 0) return vendor ? `${vendor} order` : 'Bill'
+  if (lines.length === 0) return vendor ? t(`${vendor} order`, `Bestellung ${vendor}`) : t('Bill', 'Rechnung')
   const sorted = [...lines].sort((a, b) => lineTotal(b) - lineTotal(a))
   if (lines.length === 1) return titleOf(sorted[0])
   if (lines.length === 2) return `${titleOf(sorted[0])} + ${titleOf(sorted[1])}`
-  return `${titleOf(sorted[0])} + ${lines.length - 1} more`
+  return `${titleOf(sorted[0])} + ${lines.length - 1} ${t('more', 'weitere')}`
 }
 
 /** Groups the included lines into future entries and spreads shipping/fees/discounts proportionally. */
@@ -138,7 +139,7 @@ export function buildGroups(s: ReviewState): Group[] {
   } else if (extras.length) {
     const key = 'extras'
     groups.push({
-      key, lines: extras, defaultTitle: 'Shipping & fees', title: s.titles[key] ?? 'Shipping & fees',
+      key, lines: extras, defaultTitle: t('Shipping & fees', 'Versand & Gebühren'), title: s.titles[key] ?? t('Shipping & fees', 'Versand & Gebühren'),
       kind: s.kinds[key] ?? 'Expense', tags: [...s.tags], extraShare: 0, total: extrasTotal,
     })
   }
@@ -146,16 +147,16 @@ export function buildGroups(s: ReviewState): Group[] {
 }
 
 export function buildImport(s: ReviewState): ImportEntry[] {
-  if (!s.vehicleId) throw new Error('Choose a car first.')
+  if (!s.vehicleId) throw new Error(t('Choose a car first.', 'Wähl zuerst ein Auto.'))
   const odometer = parseDecimal(s.odometer)
   return buildGroups(s).map(g => {
     const lineItems = g.lines.map(l => ({
-      name: l.name.trim() || 'Item', brand: l.brand.trim() || null, partNumber: l.partNumber.trim() || null,
+      name: l.name.trim() || t('Item', 'Position'), brand: l.brand.trim() || null, partNumber: l.partNumber.trim() || null,
       quantity: num(l.quantity, 1), unitPrice: num(l.unitPrice, 0),
     }))
     if (g.extraShare !== 0) {
       lineItems.push({
-        name: g.extraShare > 0 ? 'Shipping & fees (share)' : 'Discount (share)',
+        name: g.extraShare > 0 ? t('Shipping & fees (share)', 'Versand & Gebühren (Anteil)') : t('Discount (share)', 'Rabatt (Anteil)'),
         brand: null, partNumber: null, quantity: 1, unitPrice: g.extraShare,
       })
     }

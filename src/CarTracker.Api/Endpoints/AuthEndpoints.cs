@@ -7,8 +7,9 @@ using Microsoft.EntityFrameworkCore;
 namespace CarTracker.Api.Endpoints;
 
 public record LoginRequest(string Email, string Password);
-public record RegisterRequest(string Code, string DisplayName, string Email, string Password);
-public record MeResponse(string Id, string Email, string DisplayName, bool IsAdmin);
+public record RegisterRequest(string Code, string DisplayName, string Email, string Password, string? Language = null);
+public record SettingsRequest(string? Language);
+public record MeResponse(string Id, string Email, string DisplayName, bool IsAdmin, string? Language);
 public record InviteCheckResponse(bool Valid, string? Note);
 
 public static class AuthEndpoints
@@ -20,11 +21,11 @@ public static class AuthEndpoints
         g.MapPost("/login", async (LoginRequest req, SignInManager<AppUser> signIn, UserManager<AppUser> users) =>
         {
             var user = await users.FindByEmailAsync(req.Email.Trim());
-            if (user is null) return Results.Problem("Wrong email or password.", statusCode: 401);
+            if (user is null) return Loc.Problem("Wrong email or password.", "E-Mail oder Passwort ist falsch.", 401);
 
             var result = await signIn.PasswordSignInAsync(user, req.Password, isPersistent: true, lockoutOnFailure: true);
-            if (result.IsLockedOut) return Results.Problem("Too many failed attempts. Try again in 15 minutes.", statusCode: 423);
-            if (!result.Succeeded) return Results.Problem("Wrong email or password.", statusCode: 401);
+            if (result.IsLockedOut) return Loc.Problem("Too many failed attempts. Try again in 15 minutes.", "Zu viele Fehlversuche. Versuch es in 15 Minuten nochmal.", 423);
+            if (!result.Succeeded) return Loc.Problem("Wrong email or password.", "E-Mail oder Passwort ist falsch.", 401);
             return Results.Ok(ToMe(user));
         }).RequireRateLimiting("auth");
 
@@ -41,6 +42,15 @@ public static class AuthEndpoints
             return user is null ? Results.Unauthorized() : Results.Ok(ToMe(user));
         });
 
+        g.MapPut("/settings", async (SettingsRequest req, ClaimsPrincipal p, UserManager<AppUser> users) =>
+        {
+            var user = await users.GetUserAsync(p);
+            if (user is null) return Results.Unauthorized();
+            user.Language = Loc.Normalize(req.Language);
+            await users.UpdateAsync(user);
+            return Results.Ok(ToMe(user));
+        }).RequireAuthorization();
+
         g.MapGet("/invite/{code}", async (string code, AppDbContext db) =>
         {
             var invite = await FindOpenInvite(db, code);
@@ -51,10 +61,10 @@ public static class AuthEndpoints
             SignInManager<AppUser> signIn) =>
         {
             var invite = await FindOpenInvite(db, req.Code);
-            if (invite is null) return Results.Problem("This invite is invalid, used or expired.", statusCode: 400);
+            if (invite is null) return Loc.Problem("This invite is invalid, used or expired.", "Diese Einladung ist ungültig, schon benutzt oder abgelaufen.", 400);
 
             var name = req.DisplayName.Trim();
-            if (name.Length is 0 or > 50) return Results.Problem("Please enter a name (max. 50 characters).", statusCode: 400);
+            if (name.Length is 0 or > 50) return Loc.Problem("Please enter a name (max. 50 characters).", "Bitte gib einen Namen ein (max. 50 Zeichen).", 400);
 
             var user = new AppUser
             {
@@ -62,6 +72,7 @@ public static class AuthEndpoints
                 Email = req.Email.Trim(),
                 DisplayName = name,
                 IsAdmin = invite.GrantsAdmin,
+                Language = Loc.Normalize(req.Language),
             };
             var created = await users.CreateAsync(user, req.Password);
             if (!created.Succeeded)
@@ -83,5 +94,5 @@ public static class AuthEndpoints
         return db.Invites.FirstOrDefaultAsync(i => i.CodeHash == hash && i.UsedAt == null && i.ExpiresAt > now);
     }
 
-    private static MeResponse ToMe(AppUser u) => new(u.Id, u.Email ?? "", u.DisplayName, u.IsAdmin);
+    private static MeResponse ToMe(AppUser u) => new(u.Id, u.Email ?? "", u.DisplayName, u.IsAdmin, u.Language);
 }

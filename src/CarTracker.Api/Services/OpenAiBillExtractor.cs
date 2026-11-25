@@ -43,8 +43,10 @@ public class OpenAiBillExtractor(HttpClient http, AiOptions options, ILogger<Ope
         - Shipping, payment fees, deposits (Pfand/Altteilpfand) and discounts are their own line_items with line_type
           shipping / fee / discount; discounts have NEGATIVE totals. Workshop work time is line_type labour.
         - Sum of all line_item totals should equal grand_total. Do not invent lines to make it match.
-        - category: one or two lowercase English words describing the car area, e.g. brakes, suspension, oil, engine,
-          exhaust, wheels, tyres, lighting, interior, exterior, cooling, electrical, tools, cleaning. null if unclear.
+        - category: one or two lowercase words describing the car area, in the language given in the request (CATEGORY LANGUAGE).
+          English examples: brakes, suspension, oil, engine, exhaust, wheels, tyres, lighting, interior, exterior, cooling,
+          electrical, tools, cleaning. German examples: bremsen, fahrwerk, öl, motor, auspuff, felgen, reifen, beleuchtung,
+          innenraum, karosserie, kühlung, elektrik, werkzeug, pflege. null if unclear.
         - purpose: your best guess what the item is for the car owner:
           upgrade = modification beyond stock (performance/tuning parts, coilovers, aftermarket wheels, styling, retrofits),
           repair = replacing worn/broken parts (brake discs, bushings, sensors, gaskets),
@@ -57,17 +59,18 @@ public class OpenAiBillExtractor(HttpClient http, AiOptions options, ILogger<Ope
         - If the document is not an invoice/receipt at all, set is_invoice=false and leave the rest empty/null.
         """;
 
-    public async Task<ExtractionResult> ExtractAsync(byte[] content, string contentType, string fileName, CancellationToken ct)
+    public async Task<ExtractionResult> ExtractAsync(byte[] content, string contentType, string fileName, string language, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(options.ApiKey))
-            return new(null, "No OpenAI API key configured. Fill in the bill manually or set Ai:ApiKey.", null, 0, 0, 0, false);
+            return new(null, Loc.T("No OpenAI API key configured. Fill in the bill manually or set Ai:ApiKey.", "Kein OpenAI-Schlüssel eingerichtet. Füll die Rechnung von Hand aus oder setz Ai:ApiKey."), null, 0, 0, 0, false);
 
         var b64 = Convert.ToBase64String(content);
         JsonObject filePart = contentType == "application/pdf"
             ? new() { ["type"] = "input_file", ["filename"] = fileName, ["file_data"] = $"data:application/pdf;base64,{b64}" }
             : new() { ["type"] = "input_image", ["image_url"] = $"data:{contentType};base64,{b64}", ["detail"] = "high" };
 
-        var raw = await OpenAiResponses.CallAsync(http, options, log, Instructions, filePart, "Extract the bill.", "bill", Schema(), ct);
+        var prompt = $"Extract the bill. CATEGORY LANGUAGE: {(Loc.Normalize(language) == "de" ? "German" : "English")}.";
+        var raw = await OpenAiResponses.CallAsync(http, options, log, Instructions, filePart, prompt, "bill", Schema(), ct);
         return FromRaw(raw);
     }
 
@@ -84,7 +87,7 @@ public class OpenAiBillExtractor(HttpClient http, AiOptions options, ILogger<Ope
         }
         catch (JsonException)
         {
-            return new(null, "The AI result couldn't be read.", r.Model, r.InputTokens, r.OutputTokens, r.EstimatedCostUsd, true);
+            return new(null, Loc.T("The AI result couldn't be read.", "Das KI-Ergebnis war nicht lesbar."), r.Model, r.InputTokens, r.OutputTokens, r.EstimatedCostUsd, true);
         }
     }
 
@@ -139,9 +142,10 @@ public class OpenAiBillExtractor(HttpClient http, AiOptions options, ILogger<Ope
 /// <summary>Returns a fixed sample bill. For clicking through the UI without spending credits (Ai:Provider=Fake).</summary>
 public class FakeBillExtractor : IBillExtractor
 {
-    public async Task<ExtractionResult> ExtractAsync(byte[] content, string contentType, string fileName, CancellationToken ct)
+    public async Task<ExtractionResult> ExtractAsync(byte[] content, string contentType, string fileName, string language, CancellationToken ct)
     {
         await Task.Delay(1500, ct); // feel the "processing" state
+        var de = Loc.Normalize(language) == "de";
         var data = new BillExtraction
         {
             IsInvoice = true, Vendor = "Leebmann24 GmbH", InvoiceNumber = $"FAKE-{content.Length}", InvoiceDate = "2026-11-20",
@@ -149,10 +153,10 @@ public class FakeBillExtractor : IBillExtractor
             Notes = "Sample data from the fake extractor.",
             LineItems =
             [
-                new() { Name = "Bremsscheibe vorne belüftet", ShortName = "Zimmermann Bremsscheiben vorne", Brand = "Zimmermann", PartNumber = "150.3471.20", Quantity = 2, UnitPrice = 189.90m, Total = 379.80m, LineType = "part", Category = "brakes", Purpose = "repair" },
-                new() { Name = "Bremsbelagsatz vorne", ShortName = "Textar Bremsbeläge vorne", Brand = "Textar", PartNumber = "2508101", Quantity = 1, UnitPrice = 129.95m, Total = 129.95m, LineType = "part", Category = "brakes", Purpose = "repair" },
-                new() { Name = "Verschleißanzeige vorne", ShortName = "Verschleißanzeige vorne", Brand = "BMW", PartNumber = "34356792289", Quantity = 1, UnitPrice = 14.73m, Total = 14.73m, LineType = "part", Category = "brakes", Purpose = "repair" },
-                new() { Name = "Motoröl 5W-30 LL-04 5L", ShortName = "Castrol 5W-30", Brand = "Castrol", PartNumber = null, Quantity = 1, UnitPrice = 79.99m, Total = 79.99m, LineType = "part", Category = "oil", Purpose = "service" },
+                new() { Name = "Bremsscheibe vorne belüftet", ShortName = "Zimmermann Bremsscheiben vorne", Brand = "Zimmermann", PartNumber = "150.3471.20", Quantity = 2, UnitPrice = 189.90m, Total = 379.80m, LineType = "part", Category = de ? "bremsen" : "brakes", Purpose = "repair" },
+                new() { Name = "Bremsbelagsatz vorne", ShortName = "Textar Bremsbeläge vorne", Brand = "Textar", PartNumber = "2508101", Quantity = 1, UnitPrice = 129.95m, Total = 129.95m, LineType = "part", Category = de ? "bremsen" : "brakes", Purpose = "repair" },
+                new() { Name = "Verschleißanzeige vorne", ShortName = "Verschleißanzeige vorne", Brand = "BMW", PartNumber = "34356792289", Quantity = 1, UnitPrice = 14.73m, Total = 14.73m, LineType = "part", Category = de ? "bremsen" : "brakes", Purpose = "repair" },
+                new() { Name = "Motoröl 5W-30 LL-04 5L", ShortName = "Castrol 5W-30", Brand = "Castrol", PartNumber = null, Quantity = 1, UnitPrice = 79.99m, Total = 79.99m, LineType = "part", Category = de ? "öl" : "oil", Purpose = "service" },
                 new() { Name = "Versand DHL", ShortName = "Versand", Brand = null, PartNumber = null, Quantity = 1, UnitPrice = 7.90m, Total = 7.90m, LineType = "shipping", Category = null, Purpose = "other" },
             ],
         };

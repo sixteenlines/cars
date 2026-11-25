@@ -97,7 +97,7 @@ public class OpenAiFuelScanner(HttpClient http, AiOptions options, ILogger<OpenA
         }
         catch (JsonException)
         {
-            return new(null, "The AI result couldn't be read.", r.Model, r.InputTokens, r.OutputTokens, r.EstimatedCostUsd, true);
+            return new(null, Loc.T("The AI result couldn't be read.", "Das KI-Ergebnis war nicht lesbar."), r.Model, r.InputTokens, r.OutputTokens, r.EstimatedCostUsd, true);
         }
     }
 

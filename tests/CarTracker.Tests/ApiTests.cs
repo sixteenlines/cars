@@ -116,3 +116,43 @@ public class ApiTests(AppFactory factory) : IClassFixture<AppFactory>
         Assert.Equal(58750, stats.LatestOdometer);
     }
 }
+
+public class LanguageTests(AppFactory factory) : IClassFixture<AppFactory>
+{
+    [Fact]
+    public async Task Language_setting_is_saved_and_messages_follow_accept_language()
+    {
+        var c = await factory.CreateUserAsync("lang@example.test");
+        var me = await c.GetFromJsonAsync<MeResponse>("/api/auth/me");
+        Assert.Null(me!.Language);
+
+        var saved = await (await c.PutAsJsonAsync("/api/auth/settings", new SettingsRequest("de-DE"))).Content.ReadFromJsonAsync<MeResponse>();
+        Assert.Equal("de", saved!.Language);
+
+        var bad = new VehicleRequest("", null, null, null, null, null, null, null, null, null, null, null, null, false, null, null);
+        c.DefaultRequestHeaders.AcceptLanguage.ParseAdd("de");
+        var de = await (await c.PostAsJsonAsync("/api/vehicles", bad)).Content.ReadAsStringAsync();
+        Assert.Contains("Ein Name ist nötig", de);
+
+        c.DefaultRequestHeaders.AcceptLanguage.Clear();
+        c.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en");
+        var en = await (await c.PostAsJsonAsync("/api/vehicles", bad)).Content.ReadAsStringAsync();
+        Assert.Contains("Name is required", en);
+    }
+
+    [Fact]
+    public async Task Registration_errors_are_german_for_german_users()
+    {
+        var code = InviteCodes.Generate();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Invites.Add(new Invite { CodeHash = InviteCodes.Hash(code), ExpiresAt = DateTimeOffset.UtcNow.AddDays(1) });
+            await db.SaveChangesAsync();
+        }
+        var c = factory.CreateClient();
+        c.DefaultRequestHeaders.AcceptLanguage.ParseAdd("de");
+        var res = await c.PostAsJsonAsync("/api/auth/register", new RegisterRequest(code, "Kurz", "kurz@example.test", "short", "de"));
+        Assert.Contains("mindestens 10 Zeichen", await res.Content.ReadAsStringAsync());
+    }
+}

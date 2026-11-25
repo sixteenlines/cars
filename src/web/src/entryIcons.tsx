@@ -4,7 +4,8 @@ import {
 } from 'lucide-react'
 import type { ComponentType, SVGProps } from 'react'
 import type { EntryKind } from './api'
-import { categoryFor, KIND_HUE } from './categories'
+import { categoryFor, categoryLabel, KIND_HUE } from './categories'
+import { kindLabel } from './i18n'
 
 type IconProps = { size?: number; className?: string }
 type IconComp = ComponentType<IconProps>
@@ -86,8 +87,8 @@ const KIND_ICON: Record<EntryKind, IconComp> = { Mod: Gauge, Maintenance: Wrench
 
 export function iconFor(entry: { kind: EntryKind; title: string; tags: string[] }) {
   const cat = categoryFor(entry)
-  if (cat && ICONS[cat.key]) return { icon: ICONS[cat.key], hue: cat.hue, label: cat.label }
-  return { icon: KIND_ICON[entry.kind], hue: KIND_HUE[entry.kind], label: entry.kind }
+  if (cat && ICONS[cat.key]) return { icon: ICONS[cat.key], hue: cat.hue, label: categoryLabel(cat) }
+  return { icon: KIND_ICON[entry.kind], hue: KIND_HUE[entry.kind], label: kindLabel(entry.kind) }
 }
 
 export function EntryIcon({ entry, size = 22, large }: { entry: { kind: EntryKind; title: string; tags: string[] }; size?: number; large?: boolean }) {
