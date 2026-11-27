@@ -72,7 +72,7 @@ export function PhotoGrid({ photos, pending = [], uploading, coverId, onAdd, onR
   )
 }
 
-function Lightbox({ photos, index, onIndex, onClose, coverId, onDelete, onSetCover }: {
+export function Lightbox({ photos, index, onIndex, onClose, coverId, onDelete, onSetCover }: {
   photos: Photo[]; index: number; onIndex: (i: number) => void; onClose: () => void
   coverId?: number | null; onDelete?: (p: Photo) => void; onSetCover?: (p: Photo) => void
 }) {

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, FUEL_GRADES, gradeLabel, photoUrl, uploadPhotos, type FuelUp, type Photo, type Vehicle } from '../api'
 import { EntryRow } from '../components/EntryRow'
+import { TimelineTab } from '../components/Timeline'
 import { PhotoGrid, type PendingPhoto } from '../components/PhotoGrid'
 import { Empty, ErrorText, Spinner, TopBar } from '../components/ui'
 import { fmtDate, fmtKm, fmtMoney, fmtMoneyShort, fmtNum } from '../format'
@@ -24,7 +25,7 @@ export default function VehicleDetail() {
   const vehicleId = Number(useParams().id)
   const { data: v, isLoading } = useVehicle(vehicleId)
   const [params, setParams] = useSearchParams()
-  const tab = params.get('tab') === 'photos' ? 'photos' : params.get('tab') === 'fuel' ? 'fuel' : 'entries'
+  const tab = (['photos', 'fuel', 'timeline'] as const).find(x => x === params.get('tab')) ?? 'entries'
 
   if (isLoading) return <div className="center"><Spinner /></div>
   if (!v) return <><TopBar back="/" title={t('Not found', 'Nicht gefunden')} /><Empty title={t("This car doesn't exist (anymore).", 'Dieses Auto gibt es nicht (mehr).')} /></>
@@ -57,17 +58,21 @@ export default function VehicleDetail() {
 
       <div className="tabs" role="tablist">
         <button role="tab" className={tab === 'entries' ? 'on' : ''} onClick={() => setParams({}, { replace: true })}>
-          {t('Entries', 'Einträge')} ({v.stats.entryCount})
+          {t('Entries', 'Einträge')}<span className="tab-count"> ({v.stats.entryCount})</span>
+        </button>
+        <button role="tab" className={tab === 'timeline' ? 'on' : ''} onClick={() => setParams({ tab: 'timeline' }, { replace: true })}>
+          {t('Timeline', 'Verlauf')}
         </button>
         <button role="tab" className={tab === 'fuel' ? 'on' : ''} onClick={() => setParams({ tab: 'fuel' }, { replace: true })}>
-          {t('Fuel', 'Tanken')} ({v.stats.fuelCount})
+          {t('Fuel', 'Tanken')}<span className="tab-count"> ({v.stats.fuelCount})</span>
         </button>
         <button role="tab" className={tab === 'photos' ? 'on' : ''} onClick={() => setParams({ tab: 'photos' }, { replace: true })}>
-          {t('Photos', 'Fotos')} ({v.stats.photoCount})
+          {t('Photos', 'Fotos')}<span className="tab-count"> ({v.stats.photoCount})</span>
         </button>
       </div>
 
-      {tab === 'entries' ? <EntriesTab vehicle={v} /> : tab === 'fuel' ? <FuelTab vehicle={v} /> : <PhotosTab vehicle={v} />}
+      {tab === 'entries' ? <EntriesTab vehicle={v} /> : tab === 'timeline' ? <TimelineTab vehicle={v} />
+        : tab === 'fuel' ? <FuelTab vehicle={v} /> : <PhotosTab vehicle={v} />}
     </>
   )
 }
