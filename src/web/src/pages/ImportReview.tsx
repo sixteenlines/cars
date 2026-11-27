@@ -3,7 +3,7 @@ import { AlertTriangle, CheckCircle2, ExternalLink, FileText, Plus, RotateCw, Tr
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, documentFileUrl, type BillDocument, type EntryKind, type EntryRef } from '../api'
-import { buildGroups, buildImport, initialState, isExtra, lineTotal, type ReviewLine, type ReviewState, type SplitMode } from '../billImport'
+import { buildGroups, buildImport, initialState, isExtra, lineTotal, spreadDefault, type ReviewLine, type ReviewState, type SplitMode } from '../billImport'
 import { EntryIcon } from '../entryIcons'
 import { TagInput } from '../components/TagInput'
 import { ConfirmButton, Empty, ErrorText, Field, Spinner, TopBar } from '../components/ui'
@@ -13,9 +13,9 @@ import { kindLabel, plural, t } from '../i18n'
 import { inboxKey } from './ImportUpload'
 
 const MODES: { key: SplitMode; label: () => string }[] = [
-  { key: 'single', label: () => t('One entry', 'Ein Eintrag') },
-  { key: 'category', label: () => t('By category', 'Nach Kategorie') },
   { key: 'item', label: () => t('Each item', 'Jede Position') },
+  { key: 'category', label: () => t('By category', 'Nach Kategorie') },
+  { key: 'single', label: () => t('Whole bill', 'Ganze Rechnung') },
 ]
 const KIND_OPTIONS: EntryKind[] = ['Mod', 'Maintenance', 'Expense', 'Event']
 const lineTypeLabel = (type: string): string | undefined => ({
@@ -166,7 +166,9 @@ function Review({ doc, state, setState, vehicles }: {
   const itemsTotal = state.lines.filter(l => l.include).reduce((a, l) => a + lineTotal(l), 0)
   const billTotal = doc.extraction?.grand_total ?? null
   const totalsMatch = billTotal == null || Math.abs(itemsTotal - billTotal) < 0.05
-  const hasExtras = state.lines.some(l => l.include && isExtra(l)) && state.mode !== 'single'
+  // The toggle is only about shipping & fees; discounts are always shared out over the entries.
+  const hasCharges = state.mode !== 'single' && state.lines.some(l => l.include && isExtra(l) && l.lineType !== 'discount' && lineTotal(l) > 0)
+    && state.lines.some(l => l.include && !isExtra(l))
 
   return (
     <div className="form" style={{ marginTop: 12 }}>
@@ -230,12 +232,15 @@ function Review({ doc, state, setState, vehicles }: {
       <div className="stack" style={{ gap: 10 }}>
         <h2>{t('Create entries', 'Einträge anlegen')}</h2>
         <div className="seg">
-          {MODES.map(m => <button type="button" key={m.key} className={state.mode === m.key ? 'on' : ''} onClick={() => set({ mode: m.key })}>{m.label()}</button>)}
+          {MODES.map(m => <button type="button" key={m.key} className={state.mode === m.key ? 'on' : ''} onClick={() => set({ mode: m.key, spreadExtras: spreadDefault(m.key) })}>{m.label()}</button>)}
         </div>
-        {hasExtras && (
+        {state.mode === 'single' && (
+          <p className="faint" style={{ margin: 0 }}>{t('All items of the bill in one entry, each with its own price.', 'Alle Positionen der Rechnung in einem Eintrag, jede mit eigenem Preis.')}</p>
+        )}
+        {hasCharges && (
           <label className="check">
             <input type="checkbox" checked={state.spreadExtras} onChange={e => set({ spreadExtras: e.target.checked })} />
-            {t('Spread shipping, fees & discounts over the entries', 'Versand, Gebühren & Rabatte auf die Einträge verteilen')}
+            {t('Spread shipping & fees over the items (instead of a separate entry)', 'Versand & Gebühren auf die Positionen verteilen (statt eigenem Eintrag)')}
           </label>
         )}
         {groups.map(g => (
@@ -250,7 +255,7 @@ function Review({ doc, state, setState, vehicles }: {
                 onChange={e => set({ kinds: { ...state.kinds, [g.key]: e.target.value as EntryKind } })}>
                 {KIND_OPTIONS.map(k => <option key={k} value={k}>{kindLabel(k)}</option>)}
               </select>
-              <span className="faint grow">{plural(g.lines.length, ['item', 'Position'], ['items', 'Positionen'])}{g.extraShare ? t(` · incl. ${fmtMoney(g.extraShare)} shipping/fees`, ` · inkl. ${fmtMoney(g.extraShare)} Versand/Gebühren`) : ''}</span>
+              <span className="faint grow">{plural(g.lines.length, ['item', 'Position'], ['items', 'Positionen'])}{g.extraShare ? t(` · incl. ${fmtMoney(g.extraShare)} shipping/fees`, ` · inkl. ${fmtMoney(g.extraShare)} Versand/Gebühren`) : ''}{g.discountShare ? t(` · ${fmtMoney(g.discountShare)} discount`, ` · ${fmtMoney(g.discountShare)} Rabatt`) : ''}</span>
               <strong>{fmtMoney(g.total)}</strong>
             </div>
             {g.tags.length > 0 && <div className="row wrap" style={{ gap: 4 }}>{g.tags.map(t => <span key={t} className="tag">#{t}</span>)}</div>}

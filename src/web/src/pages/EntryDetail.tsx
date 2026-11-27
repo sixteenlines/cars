@@ -104,6 +104,12 @@ export default function EntryDetail() {
                   <div className="s">{[d.fileName, d.invoiceDate ? fmtDate(d.invoiceDate) : null].filter(Boolean).join(' · ')}</div></div>
               </a>
             ))}
+            {e.documents.map(d => (
+              <Link key={`all-${d.id}`} to={`/import/${d.id}`} className="list-item" style={{ minHeight: 48 }}>
+                <Link2 size={20} className="muted" />
+                <div className="main"><div className="t">{t('All entries from this bill', 'Alle Einträge dieser Rechnung')}</div></div>
+              </Link>
+            ))}
           </div>
         </div>
       )}

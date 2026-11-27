@@ -27,6 +27,7 @@ export interface ReviewState {
   odometer: string
   status: EntryStatus
   mode: SplitMode
+  /** Shipping & fees spread over the entries (else they become their own entry). Discounts are always spread. */
   spreadExtras: boolean
   tags: string[]
   notes: string
@@ -43,13 +44,19 @@ export interface Group {
   title: string
   kind: EntryKind
   tags: string[]
-  /** Share of shipping/fees/discounts added to this group (0 if not spread). */
+  /** Share of shipping/fees added to this group (0 if not spread). */
   extraShare: number
+  /** Share of discounts taken off this group (negative or 0). */
+  discountShare: number
   total: number
 }
 
 const EXTRA_TYPES: LineType[] = ['shipping', 'fee', 'discount']
 export const isExtra = (l: ReviewLine) => EXTRA_TYPES.includes(l.lineType)
+const isDiscount = (l: ReviewLine) => l.lineType === 'discount' || lineTotal(l) < 0
+
+/** Each item → its own entry with its own price, shipping as a separate entry. Bigger groups spread shipping. */
+export const spreadDefault = (mode: SplitMode) => mode !== 'item'
 
 export const kindFromPurpose = (p: Purpose): EntryKind =>
   p === 'upgrade' ? 'Mod' : p === 'other' ? 'Expense' : 'Maintenance'
@@ -78,7 +85,7 @@ export function initialState(x: BillExtraction | null, vehicleId: number | null)
   const notes = [x?.invoice_number ? `${t('Invoice', 'Rechnung')} ${x.invoice_number}` : null, x?.notes].filter(Boolean).join(' · ')
   return {
     vehicleId, date: x?.invoice_date ?? '', vendor: x?.vendor ?? '', odometer: x?.odometer_km?.toString() ?? '',
-    status: 'Done', mode: 'category', spreadExtras: true, tags: [], notes, lines, titles: {}, kinds: {},
+    status: 'Done', mode: 'item', spreadExtras: spreadDefault('item'), tags: [], notes, lines, titles: {}, kinds: {},
   }
 }
 
@@ -98,7 +105,24 @@ function defaultTitle(lines: ReviewLine[], vendor: string) {
   return `${titleOf(sorted[0])} + ${lines.length - 1} ${t('more', 'weitere')}`
 }
 
-/** Groups the included lines into future entries and spreads shipping/fees/discounts proportionally. */
+/** Splits `amount` over the groups in proportion to their totals; the last one takes the rounding rest. */
+function spread(groups: Group[], amount: number, field: 'extraShare' | 'discountShare') {
+  const base = groups.reduce((a, g) => a + g.total, 0)
+  let assigned = 0
+  const shares = groups.map((g, i) => {
+    const share = i === groups.length - 1
+      ? round2(amount - assigned)
+      : round2(base > 0 ? amount * (g.total / base) : amount / groups.length)
+    assigned = round2(assigned + share)
+    return share
+  })
+  groups.forEach((g, i) => { g[field] = shares[i]; g.total = round2(g.total + shares[i]) })
+}
+
+/**
+ * Groups the included lines into future entries. Discounts are always spread proportionally (they lower what
+ * each part really cost); shipping & fees are spread too, or become one entry of their own.
+ */
 export function buildGroups(s: ReviewState): Group[] {
   const included = s.lines.filter(l => l.include)
   let items = included.filter(l => !isExtra(l))
@@ -120,29 +144,28 @@ export function buildGroups(s: ReviewState): Group[] {
       key, lines, defaultTitle: def, title: s.titles[key] ?? def,
       kind: s.kinds[key] ?? kindFromPurpose(top.purpose),
       tags: [...new Set([...s.tags, ...cats])],
-      extraShare: 0, total: round2(lines.reduce((a, l) => a + lineTotal(l), 0)),
+      extraShare: 0, discountShare: 0, total: round2(lines.reduce((a, l) => a + lineTotal(l), 0)),
     }
   })
 
-  const extrasTotal = round2(extras.reduce((a, l) => a + lineTotal(l), 0))
-  if (extras.length && s.spreadExtras && groups.length) {
-    const base = groups.reduce((a, g) => a + g.total, 0)
-    let assigned = 0
-    groups.forEach((g, i) => {
-      const share = i === groups.length - 1
-        ? round2(extrasTotal - assigned)
-        : round2(base > 0 ? extrasTotal * (g.total / base) : extrasTotal / groups.length)
-      assigned = round2(assigned + share)
-      g.extraShare = share
-      g.total = round2(g.total + share)
-    })
-  } else if (extras.length) {
+  const sum = (ls: ReviewLine[]) => round2(ls.reduce((a, l) => a + lineTotal(l), 0))
+  const discounts = extras.filter(isDiscount)
+  const charges = extras.filter(l => !isDiscount(l))
+  // Shipping first: when it's spread, a discount is then shared out over item + its shipping share.
+  const ownEntry = charges.length > 0 && !s.spreadExtras
+  if (charges.length && !ownEntry) spread(groups, sum(charges), 'extraShare')
+  if (ownEntry) {
     const key = 'extras'
+    const def = charges.length === 1 && charges[0].lineType === 'shipping'
+      ? t('Shipping', 'Versand') : t('Shipping & fees', 'Versand & Gebühren')
+    const title = s.vendor.trim() ? `${def} ${s.vendor.trim()}` : def
     groups.push({
-      key, lines: extras, defaultTitle: t('Shipping & fees', 'Versand & Gebühren'), title: s.titles[key] ?? t('Shipping & fees', 'Versand & Gebühren'),
-      kind: s.kinds[key] ?? 'Expense', tags: [...s.tags], extraShare: 0, total: extrasTotal,
+      key, lines: charges, defaultTitle: title, title: s.titles[key] ?? title,
+      kind: s.kinds[key] ?? 'Expense', tags: [...s.tags], extraShare: 0, discountShare: 0, total: sum(charges),
     })
   }
+  // Vouchers lower what the parts cost; a separate shipping entry keeps its price from the bill.
+  if (discounts.length) spread(groups.filter(g => g.key !== 'extras'), sum(discounts), 'discountShare')
   return groups
 }
 
@@ -155,10 +178,10 @@ export function buildImport(s: ReviewState): ImportEntry[] {
       quantity: num(l.quantity, 1), unitPrice: num(l.unitPrice, 0),
     }))
     if (g.extraShare !== 0) {
-      lineItems.push({
-        name: g.extraShare > 0 ? t('Shipping & fees (share)', 'Versand & Gebühren (Anteil)') : t('Discount (share)', 'Rabatt (Anteil)'),
-        brand: null, partNumber: null, quantity: 1, unitPrice: g.extraShare,
-      })
+      lineItems.push({ name: t('Shipping & fees (share)', 'Versand & Gebühren (Anteil)'), brand: null, partNumber: null, quantity: 1, unitPrice: g.extraShare })
+    }
+    if (g.discountShare !== 0) {
+      lineItems.push({ name: t('Discount (share)', 'Rabatt (Anteil)'), brand: null, partNumber: null, quantity: 1, unitPrice: g.discountShare })
     }
     return {
       vehicleId: s.vehicleId!,

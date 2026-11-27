@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using CarTracker.Api.Data;
 using CarTracker.Api.Endpoints;
 using CarTracker.Api.Services;
@@ -93,6 +94,28 @@ public class BillImportTests(BillAppFactory factory) : IClassFixture<BillAppFact
 
         var pdf = await c.GetAsync($"/api/documents/{doc.Id}/file");
         Assert.Equal("application/pdf", pdf.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task Bill_split_into_items_sharing_a_new_tag_imports()
+    {
+        // One entry per item: several entries bring the same not-yet-existing tag in one request.
+        var c = await factory.CreateUserAsync("items@example.test");
+        var car = await (await c.PostAsJsonAsync("/api/vehicles", Car("E46"))).Content.ReadFromJsonAsync<VehicleDto>();
+        var doc = await WaitUntilProcessed(c, (await (await c.PostAsync("/api/documents", Upload(FakePdf))).Content.ReadFromJsonAsync<DocumentDto>())!.Id);
+
+        EntryRequest Item(string title, decimal price, params string[] tags) => new(EntryKind.Maintenance, EntryStatus.Done, title,
+            new DateOnly(2026, 11, 20), null, null, "Daparto", null, null, null, [.. tags], [new LineItemRequest(title, null, null, 1, price)]);
+        var res = await c.PostAsJsonAsync($"/api/documents/{doc.Id}/import", new ImportRequest([
+            new ImportEntry(car!.Id, Item("Zündkerzen", 34m, "motor", "daparto")),
+            new ImportEntry(car.Id, Item("Ventildeckeldichtung", 39.90m, "motor", "daparto")),
+            new ImportEntry(car.Id, Item("Versand", 5.95m, "daparto")),
+        ]));
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.Equal(3, (await res.Content.ReadFromJsonAsync<List<EntryRef>>())!.Count);
+
+        var tags = await c.GetFromJsonAsync<List<JsonElement>>("/api/tags");
+        Assert.Equal(["daparto", "motor"], tags!.Select(t => t.GetProperty("name").GetString()).Order());
     }
 
     [Fact]

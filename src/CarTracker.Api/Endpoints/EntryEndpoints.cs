@@ -132,7 +132,11 @@ public static class EntryEndpoints
     {
         var names = raw.Select(Mapping.NormalizeTag).OfType<string>().Distinct().Take(20).ToList();
         var existing = await db.Tags.Where(t => t.OwnerId == userId && names.Contains(t.Name)).ToListAsync();
-        var created = names.Except(existing.Select(t => t.Name)).Select(n => new Tag { OwnerId = userId, Name = n });
-        return [.. existing, .. created];
+        // Tags created earlier in this same request (a bill imported as several entries) aren't in the DB yet:
+        // reuse them, or the save fails on the unique (owner, name) index.
+        var pending = db.Tags.Local.Where(t => db.Entry(t).State == EntityState.Added && t.OwnerId == userId && names.Contains(t.Name)).ToList();
+        var known = existing.Concat(pending).DistinctBy(t => t.Name).ToList();
+        var created = names.Except(known.Select(t => t.Name)).Select(n => new Tag { OwnerId = userId, Name = n });
+        return [.. known, .. created];
     }
 }
