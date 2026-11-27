@@ -132,7 +132,7 @@ export default function ImportReview() {
 
 const blankLine = (): ReviewLine => ({
   key: `m${Math.random().toString(36).slice(2)}`, include: true, name: '', shortName: '', brand: '', partNumber: '', quantity: '1',
-  unitPrice: '', lineType: 'part', category: null, purpose: 'repair',
+  unitPrice: '', lineType: 'part', category: null, purpose: 'repair', seller: '',
 })
 
 function BillCard({ doc, preview, onTogglePreview }: { doc: BillDocument; preview: boolean; onTogglePreview: () => void }) {
@@ -216,6 +216,7 @@ function Review({ doc, state, setState, vehicles }: {
               <div className="row wrap" style={{ gap: 4, paddingLeft: 34 }}>
                 {lineTypeLabel(l.lineType) && <span className="tag">{lineTypeLabel(l.lineType)}</span>}
                 {l.category && <span className="tag">#{l.category}</span>}
+                {l.seller && <span className="faint">{l.seller}</span>}
                 <span className="spacer" />
                 <strong className="amount">{fmtMoney(lineTotal(l))}</strong>
               </div>
@@ -255,7 +256,7 @@ function Review({ doc, state, setState, vehicles }: {
                 onChange={e => set({ kinds: { ...state.kinds, [g.key]: e.target.value as EntryKind } })}>
                 {KIND_OPTIONS.map(k => <option key={k} value={k}>{kindLabel(k)}</option>)}
               </select>
-              <span className="faint grow">{plural(g.lines.length, ['item', 'Position'], ['items', 'Positionen'])}{g.extraShare ? t(` · incl. ${fmtMoney(g.extraShare)} shipping/fees`, ` · inkl. ${fmtMoney(g.extraShare)} Versand/Gebühren`) : ''}{g.discountShare ? t(` · ${fmtMoney(g.discountShare)} discount`, ` · ${fmtMoney(g.discountShare)} Rabatt`) : ''}</span>
+              <span className="faint grow">{g.vendor ? `${g.vendor} · ` : ''}{plural(g.lines.length, ['item', 'Position'], ['items', 'Positionen'])}{g.extraShare ? t(` · incl. ${fmtMoney(g.extraShare)} shipping/fees`, ` · inkl. ${fmtMoney(g.extraShare)} Versand/Gebühren`) : ''}{g.discountShare ? t(` · ${fmtMoney(g.discountShare)} discount`, ` · ${fmtMoney(g.discountShare)} Rabatt`) : ''}</span>
               <strong>{fmtMoney(g.total)}</strong>
             </div>
             {g.tags.length > 0 && <div className="row wrap" style={{ gap: 4 }}>{g.tags.map(t => <span key={t} className="tag">#{t}</span>)}</div>}

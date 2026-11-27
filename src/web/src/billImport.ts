@@ -18,6 +18,8 @@ export interface ReviewLine {
   lineType: LineType
   category: string | null
   purpose: Purpose
+  /** Shop that sold this line on a marketplace order with several sellers; '' for single-shop bills. */
+  seller: string
 }
 
 export interface ReviewState {
@@ -48,6 +50,8 @@ export interface Group {
   extraShare: number
   /** Share of discounts taken off this group (negative or 0). */
   discountShare: number
+  /** Shop for the entry: the seller when all its lines come from one, else null (→ the bill's shop). */
+  vendor: string | null
   total: number
 }
 
@@ -79,7 +83,7 @@ export function initialState(x: BillExtraction | null, vehicleId: number | null)
     return {
       key: `l${i}`, include: true, name: l.name, shortName: l.short_name?.trim() || '', brand: l.brand ?? '', partNumber: l.part_number ?? '',
       quantity: toInput(qty), unitPrice: toInput(unit, 2),
-      lineType: l.line_type, category: l.category, purpose: l.purpose ?? 'repair',
+      lineType: l.line_type, category: l.category, purpose: l.purpose ?? 'repair', seller: l.seller?.trim() || '',
     }
   })
   const notes = [x?.invoice_number ? `${t('Invoice', 'Rechnung')} ${x.invoice_number}` : null, x?.notes].filter(Boolean).join(' · ')
@@ -105,18 +109,39 @@ function defaultTitle(lines: ReviewLine[], vendor: string) {
   return `${titleOf(sorted[0])} + ${lines.length - 1} ${t('more', 'weitere')}`
 }
 
-/** Splits `amount` over the groups in proportion to their totals; the last one takes the rounding rest. */
-function spread(groups: Group[], amount: number, field: 'extraShare' | 'discountShare') {
-  const base = groups.reduce((a, g) => a + g.total, 0)
+const sum = (ls: ReviewLine[]) => round2(ls.reduce((a, l) => a + lineTotal(l), 0))
+
+/** The one seller of these lines, or null if they come from none or several. */
+const sellerOf = (lines: ReviewLine[]) => {
+  const all = new Set(lines.map(l => l.seller))
+  return all.size === 1 && !all.has('') ? [...all][0] : null
+}
+
+/** Lines per seller ('' = the bill's own shop), in order of appearance. */
+function bySeller(lines: ReviewLine[]) {
+  const map = new Map<string, ReviewLine[]>()
+  for (const l of lines) map.set(l.seller, [...(map.get(l.seller) ?? []), l])
+  return map
+}
+
+/**
+ * Adds `amount` to the groups in proportion to `weight` (a seller's items in each group); the last one takes the
+ * rounding rest. Groups with no weight get nothing, unless no group has any — then it goes by group totals.
+ */
+function spread(groups: Group[], amount: number, field: 'extraShare' | 'discountShare', weight: (g: Group) => number) {
+  let targets = groups.map(g => ({ g, w: weight(g) })).filter(x => x.w > 0)
+  if (targets.length === 0) targets = groups.map(g => ({ g, w: g.total }))
+  if (targets.length === 0) return
+  const base = targets.reduce((a, x) => a + x.w, 0)
   let assigned = 0
-  const shares = groups.map((g, i) => {
-    const share = i === groups.length - 1
+  targets.forEach(({ g, w }, i) => {
+    const share = i === targets.length - 1
       ? round2(amount - assigned)
-      : round2(base > 0 ? amount * (g.total / base) : amount / groups.length)
+      : round2(base > 0 ? amount * (w / base) : amount / targets.length)
     assigned = round2(assigned + share)
-    return share
+    g[field] = round2(g[field] + share)
+    g.total = round2(g.total + share)
   })
-  groups.forEach((g, i) => { g[field] = shares[i]; g.total = round2(g.total + shares[i]) })
 }
 
 /**
@@ -144,28 +169,31 @@ export function buildGroups(s: ReviewState): Group[] {
       key, lines, defaultTitle: def, title: s.titles[key] ?? def,
       kind: s.kinds[key] ?? kindFromPurpose(top.purpose),
       tags: [...new Set([...s.tags, ...cats])],
-      extraShare: 0, discountShare: 0, total: round2(lines.reduce((a, l) => a + lineTotal(l), 0)),
+      extraShare: 0, discountShare: 0, vendor: s.mode === 'single' ? null : sellerOf(lines),
+      total: sum(lines),
     }
   })
+  const itemGroups = [...groups]
+  // A seller's shipping/discount belongs to that seller's items (marketplace orders: one block per shop).
+  const sellerWeight = (seller: string) => (g: Group) => sum(g.lines.filter(l => l.seller === seller))
 
-  const sum = (ls: ReviewLine[]) => round2(ls.reduce((a, l) => a + lineTotal(l), 0))
-  const discounts = extras.filter(isDiscount)
-  const charges = extras.filter(l => !isDiscount(l))
   // Shipping first: when it's spread, a discount is then shared out over item + its shipping share.
-  const ownEntry = charges.length > 0 && !s.spreadExtras
-  if (charges.length && !ownEntry) spread(groups, sum(charges), 'extraShare')
-  if (ownEntry) {
-    const key = 'extras'
+  for (const [seller, charges] of bySeller(extras.filter(l => !isDiscount(l)))) {
+    if (s.spreadExtras) { spread(itemGroups, sum(charges), 'extraShare', sellerWeight(seller)); continue }
+    const key = seller ? `extras|${seller}` : 'extras'
     const def = charges.length === 1 && charges[0].lineType === 'shipping'
       ? t('Shipping', 'Versand') : t('Shipping & fees', 'Versand & Gebühren')
-    const title = s.vendor.trim() ? `${def} ${s.vendor.trim()}` : def
+    const shop = seller || s.vendor.trim()
+    const title = shop ? `${def} ${shop}` : def
     groups.push({
       key, lines: charges, defaultTitle: title, title: s.titles[key] ?? title,
-      kind: s.kinds[key] ?? 'Expense', tags: [...s.tags], extraShare: 0, discountShare: 0, total: sum(charges),
+      kind: s.kinds[key] ?? 'Expense', tags: [...s.tags], extraShare: 0, discountShare: 0, vendor: seller || null, total: sum(charges),
     })
   }
   // Vouchers lower what the parts cost; a separate shipping entry keeps its price from the bill.
-  if (discounts.length) spread(groups.filter(g => g.key !== 'extras'), sum(discounts), 'discountShare')
+  for (const [seller, discounts] of bySeller(extras.filter(isDiscount))) {
+    spread(itemGroups, sum(discounts), 'discountShare', sellerWeight(seller))
+  }
   return groups
 }
 
@@ -189,7 +217,7 @@ export function buildImport(s: ReviewState): ImportEntry[] {
         kind: g.kind, status: s.status, title: (g.title.trim() || g.defaultTitle).slice(0, 200),
         date: s.date || null, endDate: null,
         odometer: odometer == null || Number.isNaN(odometer) ? null : Math.round(odometer),
-        vendor: s.vendor.trim() || null, notes: s.notes.trim() || null,
+        vendor: g.vendor ?? (s.vendor.trim() || null), notes: s.notes.trim() || null,
         manualTotal: null, relatedEntryId: null, tags: g.tags, lineItems,
       },
     }

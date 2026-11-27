@@ -41,6 +41,8 @@ public record BillLine
     [JsonPropertyName("category")] public string? Category { get; init; }
     /// <summary>upgrade (→ Mod) | repair | service (→ Maintenance) | other (→ Expense). A guess the user can change.</summary>
     [JsonPropertyName("purpose")] public string Purpose { get; init; } = "repair";
+    /// <summary>Shop that sold this line when one order has several (marketplaces like daparto); null for single-shop bills.</summary>
+    [JsonPropertyName("seller")] public string? Seller { get; init; }
 }
 
 public record ExtractionResult(

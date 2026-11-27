@@ -42,6 +42,14 @@ public class OpenAiBillExtractor(HttpClient http, AiOptions options, ILogger<Ope
             "Versandkosten DHL Paket" → "Versand"
         - Shipping, payment fees, deposits (Pfand/Altteilpfand) and discounts are their own line_items with line_type
           shipping / fee / discount; discounts have NEGATIVE totals. Workshop work time is line_type labour.
+        - One document can hold SEVERAL ORDERS FROM DIFFERENT SELLERS: marketplace orders (daparto, Amazon, eBay, autoteile-preiswert…)
+          list a separate block per shop, each with its own items, subtotal, shipping and total ("Deine bei X bestellten Artikel",
+          "Verkauft von X", "Händler: X"). Extract the lines of EVERY block, not only the first one, and give each block's shipping its own
+          line_item. Set seller on every line of such a document to that block's shop name as shown to the customer (e.g. "Autoteile Gigant",
+          not the legal company name "Autoteile-Gigant GmbH"). For a bill from a single shop, seller is null.
+        - vendor: the shop, or for a marketplace order the marketplace (e.g. "daparto"); if no marketplace is named, the first seller.
+        - grand_total: everything the customer pays for the whole document. With several sellers that is the sum of all blocks'
+          totals, even if the document only shows per-seller totals.
         - Sum of all line_item totals should equal grand_total. Do not invent lines to make it match.
         - category: one or two lowercase words describing the car area, in the language given in the request (CATEGORY LANGUAGE).
           English examples: brakes, suspension, oil, engine, exhaust, wheels, tyres, lighting, interior, exterior, cooling,
@@ -100,7 +108,7 @@ public class OpenAiBillExtractor(HttpClient http, AiOptions options, ILogger<Ope
         {
             ["type"] = "object",
             ["additionalProperties"] = false,
-            ["required"] = new JsonArray("name", "short_name", "brand", "part_number", "quantity", "unit_price", "total", "line_type", "category", "purpose"),
+            ["required"] = new JsonArray("name", "short_name", "brand", "part_number", "quantity", "unit_price", "total", "line_type", "category", "purpose", "seller"),
             ["properties"] = new JsonObject
             {
                 ["name"] = Str(false),
@@ -113,6 +121,7 @@ public class OpenAiBillExtractor(HttpClient http, AiOptions options, ILogger<Ope
                 ["line_type"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("part", "labour", "shipping", "discount", "fee", "other") },
                 ["category"] = Str(),
                 ["purpose"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("upgrade", "repair", "service", "other") },
+                ["seller"] = Str(),
             },
         };
 
@@ -146,6 +155,7 @@ public class FakeBillExtractor : IBillExtractor
     {
         await Task.Delay(1500, ct); // feel the "processing" state
         var de = Loc.Normalize(language) == "de";
+        if (fileName.Contains("daparto", StringComparison.OrdinalIgnoreCase)) return new(Marketplace(content, de), null, "fake", 0, 0, 0, false);
         var data = new BillExtraction
         {
             IsInvoice = true, Vendor = "Leebmann24 GmbH", InvoiceNumber = $"FAKE-{content.Length}", InvoiceDate = "2026-11-20",
@@ -162,4 +172,20 @@ public class FakeBillExtractor : IBillExtractor
         };
         return new(data, null, "fake", 0, 0, 0, false);
     }
+
+    /// <summary>Marketplace order with two sellers, each with its own shipping (file name contains "daparto").</summary>
+    private static BillExtraction Marketplace(byte[] content, bool de) => new()
+    {
+        IsInvoice = true, Vendor = "daparto", InvoiceNumber = $"FAKE-M-{content.Length}", InvoiceDate = "2026-10-03",
+        Currency = "EUR", GrandTotal = 99.23m,
+        LineItems =
+        [
+            new() { Name = "Ansaugkrümmer-Dichtungssatz", ShortName = "Ansaugkrümmer-Dichtungssatz", Brand = "Abakus", PartNumber = "123-02-005", Quantity = 1, UnitPrice = 15.40m, Total = 15.40m, LineType = "part", Category = de ? "motor" : "engine", Purpose = "repair", Seller = "Teilehaus Nord" },
+            new() { Name = "Glühkerze Duraterm High Speed", ShortName = "Bosch Glühkerzen", Brand = "Bosch", PartNumber = "0 250 402 002", Quantity = 6, UnitPrice = 7.58m, Total = 45.48m, LineType = "part", Category = de ? "motor" : "engine", Purpose = "service", Seller = "Teilehaus Nord" },
+            new() { Name = "Dichtring, Ladeluftschlauch", ShortName = "Bugiad Dichtring Ladeluftschlauch", Brand = "Bugiad", PartNumber = "81726", Quantity = 1, UnitPrice = 9.43m, Total = 9.43m, LineType = "part", Category = de ? "motor" : "engine", Purpose = "repair", Seller = "Teilehaus Nord" },
+            new() { Name = "Versandkosten", ShortName = "Versand", Quantity = 1, UnitPrice = 6.90m, Total = 6.90m, LineType = "shipping", Purpose = "other", Seller = "Teilehaus Nord" },
+            new() { Name = "Ventildeckel-Dichtung", ShortName = "Elring Ventildeckeldichtung", Brand = "Elring", PartNumber = "060.062", Quantity = 1, UnitPrice = 17.12m, Total = 17.12m, LineType = "part", Category = de ? "motor" : "engine", Purpose = "repair", Seller = "Autoteile Süd" },
+            new() { Name = "Versandkosten", ShortName = "Versand", Quantity = 1, UnitPrice = 4.90m, Total = 4.90m, LineType = "shipping", Purpose = "other", Seller = "Autoteile Süd" },
+        ],
+    };
 }

@@ -124,6 +124,8 @@ export type Purpose = 'upgrade' | 'repair' | 'service' | 'other'
 export interface BillLine {
   name: string; short_name?: string | null; brand: string | null; part_number: string | null; quantity: number
   unit_price: number; total: number; line_type: LineType; category: string | null; purpose: Purpose
+  /** Shop of this line when one order has several sellers (daparto & co.). */
+  seller?: string | null
 }
 
 export interface BillExtraction {
