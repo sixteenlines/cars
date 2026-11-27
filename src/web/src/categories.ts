@@ -67,7 +67,7 @@ export const CATEGORIES: Category[] = [
     keywords: ['membership', 'mitglied', '=club', 'adac'] },
 ]
 
-export const KIND_HUE: Record<EntryKind, number> = { Mod: 25, Maintenance: 210, Expense: 150 }
+export const KIND_HUE: Record<EntryKind, number> = { Mod: 25, Maintenance: 210, Expense: 150, Event: 265 }
 
 // Tags that say nothing about the part (TMM groups etc.) → don't let them pick the icon.
 const GENERIC_TAGS = new Set(['service', 'repair', 'other', 'maintenance', 'mod', 'mods', 'expense', 'expenses', 'misc',

@@ -56,6 +56,7 @@ export default function EntryDetail() {
         <dl className="kv" style={{ margin: 0 }}>
           <dt>{t('Date', 'Datum')}</dt><dd>{fmtDate(e.date)}{e.endDate ? ` – ${fmtDate(e.endDate)}` : ''}</dd>
           {e.odometer != null && <><dt>{t('Odometer', 'km-Stand')}</dt><dd>{fmtKm(e.odometer)}</dd></>}
+          {e.location && <><dt>{t('Location', 'Ort')}</dt><dd>{e.location}</dd></>}
           {e.vendor && <><dt>{t('Shop', 'Werkstatt')}</dt><dd>{e.vendor}</dd></>}
           {e.tags.length > 0 && <><dt>Tags</dt><dd><span className="row wrap" style={{ justifyContent: 'flex-end', gap: 4 }}>{e.tags.map(t => <span key={t} className="tag">#{t}</span>)}</span></dd></>}
         </dl>

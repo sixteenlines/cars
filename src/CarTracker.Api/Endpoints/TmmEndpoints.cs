@@ -9,8 +9,8 @@ namespace CarTracker.Api.Endpoints;
 
 public record TmmItemDto(string Type, EntryStatus Status, string Title, DateOnly? Date, decimal Cost, bool Duplicate);
 public record TmmPreviewDto(
-    string FileName, TmmVehicle Vehicle, int? MatchVehicleId, int Mods, int Maintenance, int Expenses, int Planned,
-    int FuelUps, int Duplicates, decimal Total, List<string> Warnings, List<TmmItemDto> Items);
+    string FileName, TmmVehicle Vehicle, int? MatchVehicleId, int Mods, int Maintenance, int Expenses, int Events, int Planned,
+    int FuelUps, int FuelUpsWithoutLiters, int Duplicates, decimal Total, List<string> Warnings, List<TmmItemDto> Items);
 public record TmmResultDto(int VehicleId, string VehicleName, int Entries, int FuelUps, int Skipped);
 
 /// <summary>
@@ -44,8 +44,10 @@ public static class TmmEndpoints
                 Mods: tmm.Entries.Count(e => e.Kind == EntryKind.Mod),
                 Maintenance: tmm.Entries.Count(e => e.Kind == EntryKind.Maintenance),
                 Expenses: tmm.Entries.Count(e => e.Kind == EntryKind.Expense),
+                Events: tmm.Entries.Count(e => e.Kind == EntryKind.Event),
                 Planned: tmm.Entries.Count(e => e.Status == EntryStatus.Planned),
                 FuelUps: tmm.FuelUps.Count,
+                FuelUpsWithoutLiters: tmm.FuelUps.Count(f => f.Liters is null),
                 Duplicates: items.Count(i => i.Duplicate),
                 Total: tmm.Entries.Where(e => e.Status == EntryStatus.Done).Sum(e => e.Cost) + tmm.FuelUps.Sum(f => f.Total),
                 tmm.Warnings, items));
@@ -90,7 +92,7 @@ public static class TmmEndpoints
                 var entry = new Entry
                 {
                     Vehicle = vehicle, Kind = e.Kind, Status = e.Status, Title = e.Title, Date = e.Date, EndDate = e.EndDate,
-                    Odometer = e.Odometer, Notes = e.Notes,
+                    Odometer = e.Odometer, Notes = e.Notes, Vendor = e.Vendor, Location = e.Location,
                     // With a part number the cost becomes a line item (so it shows and is searchable), else a plain total.
                     ManualTotal = e.PartNumber is null ? e.Cost : null,
                     LineItems = e.PartNumber is null ? [] : [new LineItem { Name = e.Title, PartNumber = e.PartNumber, Quantity = 1, UnitPrice = e.Cost }],

@@ -15,6 +15,7 @@ const FILTERS = [
   { key: 'Mod', label: () => 'Mods' },
   { key: 'Maintenance', label: () => t('Maintenance', 'Wartung') },
   { key: 'Expense', label: () => t('Expenses', 'Ausgaben') },
+  { key: 'Event', label: () => 'Events' },
   { key: 'planned', label: () => t('Planned', 'Geplant') },
 ] as const
 type FilterKey = (typeof FILTERS)[number]['key']
@@ -82,6 +83,9 @@ function Stats({ v }: { v: Vehicle }) {
         <div className="card stat"><div className="k">{t('Fuel', 'Sprit')}</div><div className="v">{fmtMoneyShort(s.fuelTotal)}</div>
           <div className="faint">{s.avgConsumption != null ? `Ø ${fmtL100(s.avgConsumption)}` : plural(s.fuelCount, ['fill-up', 'Tankfüllung'], ['fill-ups', 'Tankfüllungen'])}</div></div>
       )}
+      {s.eventCount > 0 && (
+        <div className="card stat"><div className="k">Events</div><div className="v">{fmtMoneyShort(s.eventsTotal)}</div><div className="faint">{plural(s.eventCount, ['event', 'Event'], ['events', 'Events'])}</div></div>
+      )}
       {s.plannedCount > 0 && (
         <div className="card stat"><div className="k">{t('Planned', 'Geplant')}</div><div className="v">{fmtMoneyShort(s.plannedTotal)}</div><div className="faint">{plural(s.plannedCount, ['item', 'Eintrag'], ['items', 'Einträge'])}</div></div>
       )}
@@ -97,7 +101,7 @@ function FuelTab({ vehicle }: { vehicle: Vehicle }) {
   const { data: log, isLoading } = useFuel(vehicle.id)
   if (isLoading || !log) return <div className="center"><Spinner /></div>
   const s = log.stats
-  const ppl = FUEL_GRADES.filter(g => s.avgPricePerLiter[g.value] != null)
+  const ppl = [...FUEL_GRADES, { value: 'unknown', label: t('No grade', 'Ohne Sorte') }].filter(g => s.avgPricePerLiter[g.value] != null)
 
   return (
     <>
@@ -176,7 +180,7 @@ function EntriesTab({ vehicle }: { vehicle: Vehicle }) {
   }, [entries, filter, tag, q])
 
   const sum = visible.reduce((acc, e) => acc + e.total, 0)
-  const newKind = filter === 'Maintenance' || filter === 'Expense' ? filter : 'Mod'
+  const newKind = filter === 'Maintenance' || filter === 'Expense' || filter === 'Event' ? filter : 'Mod'
 
   return (
     <>

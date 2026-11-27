@@ -84,6 +84,75 @@ public class TmmImportTests(AppFactory factory) : IClassFixture<AppFactory>
         Assert.Contains(f.Warnings, w => w.Contains("typo"));
     }
 
+    // Quirks from a second real export: year typed into "make", dot-thousands money, tax filed as a mod,
+    // litres with a decimal comma in the reference column, shop in "person", events (one in the future).
+    private const string Export2 = """
+        Exported from Track My Mods on 2026-11-27 at 16:14
+
+        Vehicle Specifications
+        name,make,model,year,series,badge,colour_exterior,colour_interior,registration_plate,vin,fuel_unit,odometer_unit,cost_purchase,date_purchase,odometer_purchase,note
+        Roadster,2019,ND RF,2019,Sportsline,,Jet Black,Black,,,litres,kilometers,"27.500,00 €",2022-11-14T00:00:00.000,13525.0,
+
+        Modifications
+        group,name,completed,cost,created_at,date,end_date,odometer,end_odometer,location,end_location,person,reference_number,tags,links,note
+        other,Kfz-Steuer,true,"160,00 €",2025-07-09 21:38,2023-12-01,,,,,,,,,,
+        other,Domstrebe hinten,true,"185,00 €",2026-04-07 10:27,2026-02-27,,,,,,,,,,
+        exhaust,AGA,true,"990,00 €",2026-11-01 22:24,2026-10-01,,0.0,,,,,,,,
+
+        Expenses
+        group,name,completed,cost,created_at,date,end_date,odometer,end_odometer,location,end_location,person,reference_number,tags,links,note
+        repair,Dach Undichtigkeit,true,"750,00 €",2025-07-09 16:24,2025-02-13,,,,,,Aufbereiter,,,,
+        fuel,,true,"233,19 €",2025-08-26 11:03,2025-08-26,,50050.0,,,,,"133,25",,,
+        insurance,,true,"700,00 €",2025-07-09 21:37,2024-12-01,,,,,,,,,,
+
+        Events
+        group,name,completed,cost,created_at,date,end_date,odometer,end_odometer,location,end_location,person,reference_number,tags,links,note
+        meet,Treffen 2026,true,"35,00 €",2026-08-20 15:49,2026-08-20,,,,Nürburgring,,,,,,
+        track_competition,Trackday 2099,true,"35,00 €",2026-11-01 22:13,2099-07-01,,,,Hockenheim,Hockenheim,,,,,
+        """;
+
+    [Fact]
+    public void Parses_second_export_quirks()
+    {
+        var f = TmmImport.Parse(Export2);
+        Assert.Null(f.Vehicle.Make);
+        Assert.Contains(f.Warnings, w => w.Contains("2019"));
+        Assert.Equal(27500m, f.Vehicle.PurchasePrice);
+
+        var tax = f.Entries.Single(e => e.Title == "Kfz-Steuer");
+        Assert.Equal(EntryKind.Expense, tax.Kind);
+        Assert.Equal(EntryKind.Mod, f.Entries.Single(e => e.Title == "Domstrebe hinten").Kind);
+        Assert.Contains(f.Warnings, w => w.Contains("Kfz-Steuer"));
+        Assert.Null(f.Entries.Single(e => e.Title == "AGA").Odometer);
+
+        Assert.Equal("Aufbereiter", f.Entries.Single(e => e.Title == "Dach Undichtigkeit").Vendor);
+        Assert.Equal(EntryKind.Expense, f.Entries.Single(e => e.Cost == 700m).Kind);
+        Assert.Equal(133.25m, f.FuelUps.Single().Liters);
+
+        var meet = f.Entries.Single(e => e.Title == "Treffen 2026");
+        Assert.Equal(EntryKind.Event, meet.Kind);
+        Assert.Equal(EntryStatus.Done, meet.Status);
+        Assert.Equal("Nürburgring", meet.Location);
+        Assert.Contains("meet", meet.Tags);
+        var future = f.Entries.Single(e => e.Title == "Trackday 2099");
+        Assert.Equal(EntryStatus.Planned, future.Status);
+        Assert.Equal("Hockenheim", future.Location);
+    }
+
+    [Fact]
+    public async Task Events_count_towards_total_spent()
+    {
+        var client = await factory.CreateUserAsync("tmm-events@example.test");
+        var res = await (await client.PostAsync("/api/import/tmm", Form(Export2))).Content.ReadFromJsonAsync<TmmResultDto>();
+        var car = await client.GetFromJsonAsync<VehicleDto>($"/api/vehicles/{res!.VehicleId}");
+        Assert.Equal(35m, car!.Stats.EventsTotal);
+        Assert.Equal(2, car.Stats.EventCount);
+        // 160 + 185 + 990 + 750 + 700 + 35 (done event) + 233,19 fuel; the future event is planned.
+        Assert.Equal(3053.19m, car.Stats.TotalSpent);
+        var entries = await client.GetFromJsonAsync<List<EntryDto>>($"/api/vehicles/{res.VehicleId}/entries");
+        Assert.Equal("Nürburgring", entries!.Single(e => e.Title == "Treffen 2026").Location);
+    }
+
     [Fact]
     public void Rejects_other_csv() =>
         Assert.Throws<TmmFormatException>(() => TmmImport.Parse("a,b,c\n1,2,3\n"));

@@ -6,7 +6,7 @@ import { kindLabel, t } from '../i18n'
 
 export function EntryRow({ entry }: { entry: Entry }) {
   const photo = entry.photos[0]
-  const sub = [entry.date ? fmtDate(entry.date) : null, entry.vendor, entry.tags.slice(0, 3).map(t => `#${t}`).join(' ')]
+  const sub = [entry.date ? fmtDate(entry.date) : null, entry.vendor ?? entry.location, entry.tags.slice(0, 3).map(t => `#${t}`).join(' ')]
     .filter(Boolean).join(' · ')
   return (
     <Link to={`/entries/${entry.id}`} className="list-item">

@@ -1,5 +1,5 @@
 import {
-  BatteryFull, Car, ClipboardCheck, Droplet, Fuel, Gauge, Hammer, KeyRound, Landmark, Lightbulb, Receipt,
+  BatteryFull, Car, ClipboardCheck, Flag, Droplet, Fuel, Gauge, Hammer, KeyRound, Landmark, Lightbulb, Receipt,
   ShieldCheck, Snowflake, Sparkles, Speaker, Thermometer, Users, Wrench, Zap,
 } from 'lucide-react'
 import type { ComponentType, SVGProps } from 'react'
@@ -83,10 +83,11 @@ const ICONS: Record<string, IconComp> = {
   ac: Snowflake, cooling: Thermometer, fuel: Fuel, audio: Speaker, electrical: Zap, interior: SeatIcon,
   paint: Sparkles, tools: Hammer, labour: Wrench, membership: Users,
 }
-const KIND_ICON: Record<EntryKind, IconComp> = { Mod: Gauge, Maintenance: Wrench, Expense: Receipt }
+const KIND_ICON: Record<EntryKind, IconComp> = { Mod: Gauge, Maintenance: Wrench, Expense: Receipt, Event: Flag }
 
 export function iconFor(entry: { kind: EntryKind; title: string; tags: string[] }) {
-  const cat = categoryFor(entry)
+  // Events always get the flag: their titles ("Trackday Hockenheim") shouldn't turn into a part icon.
+  const cat = entry.kind === 'Event' ? null : categoryFor(entry)
   if (cat && ICONS[cat.key]) return { icon: ICONS[cat.key], hue: cat.hue, label: categoryLabel(cat) }
   return { icon: KIND_ICON[entry.kind], hue: KIND_HUE[entry.kind], label: kindLabel(entry.kind) }
 }

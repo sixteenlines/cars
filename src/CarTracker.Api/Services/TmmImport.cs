@@ -11,7 +11,7 @@ namespace CarTracker.Api.Services;
 //   Exported from Track My Mods on …
 //   Vehicle Specifications / Groups / Modifications / Expenses / Events
 // Money comes formatted ("1 400,00 €"), dates as "2026-01-31", "2026-01-31 18:38" or "2026-01-18T00:00:00.000",
-// odometers as floats ("273000.0"). Events and Groups are ignored.
+// odometers as floats ("273000.0"). Groups are ignored; events become Event entries.
 //
 // Warnings are written in the request's language (Loc.T), they go straight to the preview screen.
 
@@ -21,7 +21,7 @@ public record TmmVehicle(
 
 public record TmmEntry(
     EntryKind Kind, EntryStatus Status, string Title, DateOnly? Date, DateOnly? EndDate, int? Odometer,
-    decimal Cost, string? PartNumber, List<string> Tags, string? Notes);
+    decimal Cost, string? PartNumber, List<string> Tags, string? Notes, string? Vendor = null, string? Location = null);
 
 public record TmmFuel(DateOnly Date, int? Odometer, decimal Total, decimal? Liters, string? Notes);
 
@@ -87,9 +87,17 @@ public static partial class TmmImport
         }
         int? Odo(string raw) => ParseNumber(raw) is { } n && n > 0 ? (int)Math.Round(miles ? n * MilesToKm : n) : null;
 
+        // People type the year into "make" sometimes ("2019") — a make is never just a number.
+        var make = Opt(s, "make", 100);
+        if (make is not null && make.All(char.IsDigit))
+        {
+            warnings.Add(Loc.T($"Make “{make}” looks like a year and was left out.", $"Marke „{make}“ sieht nach einem Baujahr aus und wurde weggelassen."));
+            make = null;
+        }
+
         var vehicle = new TmmVehicle(
             Name: Clip(Get(s, "name"), 100) is { Length: > 0 } n ? n : Loc.T("Imported car", "Importiertes Auto"),
-            Make: Opt(s, "make", 100), Model: Opt(s, "model", 100),
+            Make: make, Model: Opt(s, "model", 100),
             Year: int.TryParse(Get(s, "year"), out var y) && y is > 1885 and < 2100 ? y : null,
             Badge: Opt(s, "badge", 100), ColorExterior: Opt(s, "colour_exterior", 100), ColorInterior: Opt(s, "colour_interior", 100),
             Plate: Opt(s, "registration_plate", 20), Vin: Opt(s, "vin", 17)?.ToUpperInvariant(),
@@ -107,8 +115,11 @@ public static partial class TmmImport
             return null;
         }
 
-        foreach (var (section, isMod) in new[] { ("Modifications", true), ("Expenses", false) })
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var movedToExpenses = new List<string>();
+        foreach (var (section, kindOfSection) in new[] { ("Modifications", EntryKind.Mod), ("Expenses", EntryKind.Expense), ("Events", EntryKind.Event) })
         {
+            var isMod = kindOfSection == EntryKind.Mod;
             if (!sections.TryGetValue(section, out var rows)) continue;
             foreach (var r in rows)
             {
@@ -118,7 +129,7 @@ public static partial class TmmImport
                 var date = ParseDate(Get(r, "date"));
                 var notes = JoinNotes(Get(r, "note"), Get(r, "links"));
 
-                if (!isMod && group == "fuel")
+                if (kindOfSection == EntryKind.Expense && group == "fuel")
                 {
                     var label = name.Length > 0 ? name : Loc.T("Fill-up", "Tanken") + (date is { } fd ? " " + Loc.Date(fd) : "");
                     if (date is null)
@@ -133,18 +144,41 @@ public static partial class TmmImport
                     continue;
                 }
 
-                var (kind, tag) = isMod ? (EntryKind.Mod, ModTag(group)) : ExpenseKind(group);
-                var title = name.Length > 0 ? name : GroupLabel(group);
+                var (kind, tag) = kindOfSection switch
+                {
+                    EntryKind.Mod => (EntryKind.Mod, ModTag(group)),
+                    EntryKind.Event => (EntryKind.Event, EventTag(group)),
+                    _ => ExpenseKind(group),
+                };
+                var title = name.Length > 0 ? name : kind == EntryKind.Event ? Loc.T("Event", "Event") : GroupLabel(group);
+                // Tax or insurance filed as a mod would inflate the mod total.
+                if (isMod && group is "" or "other" && IsRunningCost(title))
+                {
+                    kind = EntryKind.Expense;
+                    movedToExpenses.Add(title);
+                }
                 var tags = new List<string>();
                 if (tag is not null) tags.Add(tag);
                 tags.AddRange(Get(r, "tags").Split([',', ';', '#', ' '], StringSplitOptions.RemoveEmptyEntries).Select(t => t.Trim()));
                 var completed = !Get(r, "completed").Equals("false", StringComparison.OrdinalIgnoreCase);
+                if (kind == EntryKind.Event && date > today) completed = false;   // a future event is planned, whatever TMM says
+                var from = Get(r, "location");
+                var to = Get(r, "end_location");
+                var location = from.Length > 0 && to.Length > 0 && from != to ? $"{from} → {to}" : from.Length > 0 ? from : to;
                 var endDate = ParseDate(Get(r, "end_date"));
 
                 file.Entries.Add(new TmmEntry(kind, completed ? EntryStatus.Done : EntryStatus.Planned, title, date,
                     endDate is { } e && date is { } d && e >= d ? e : null, CheckOdo(Odo(Get(r, "odometer")), title),
-                    cost, Opt(r, "reference_number", 100), tags, notes));
+                    cost, Opt(r, "reference_number", 100), tags, notes,
+                    Vendor: Opt(r, "person", 200), Location: location.Length > 0 ? Clip(location, 200) : null));
             }
+        }
+
+        if (movedToExpenses.Count > 0)
+        {
+            var list = string.Join(", ", movedToExpenses.Distinct());
+            warnings.Add(Loc.T($"Filed as mods in Track My Mods, imported as expenses (running costs, not mods): {list}.",
+                $"In Track My Mods als Mod eingetragen, als Ausgabe übernommen (laufende Kosten, keine Mods): {list}."));
         }
 
         file.Warnings.AddRange(warnings);
@@ -167,6 +201,21 @@ public static partial class TmmImport
         "" or "other" => null,
         _ => group,
     };
+
+    private static string? EventTag(string group) => group switch
+    {
+        "trip" => Loc.T("trip", "ausfahrt"),
+        "meet" => Loc.T("meet", "treffen"),
+        "show" => Loc.T("show", "messe"),
+        "track_competition" => Loc.T("track", "rennstrecke"),
+        "" or "other" => null,
+        _ => group,
+    };
+
+    [GeneratedRegex(@"steuer|\btax\b|versicherung|insurance|haftpflicht|kasko|zulassung|registration|\btüv\b|\bhu\b|inspektion|inspection",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex RunningCost();
+    private static bool IsRunningCost(string title) => RunningCost().IsMatch(title);
 
     private static (EntryKind, string?) ExpenseKind(string group) => group switch
     {

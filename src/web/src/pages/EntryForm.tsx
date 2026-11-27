@@ -15,7 +15,7 @@ interface PartForm { key: string; name: string; brand: string; partNumber: strin
 
 const newPart = (): PartForm => ({ key: Math.random().toString(36).slice(2), name: '', brand: '', partNumber: '', quantity: '1', unitPrice: '' })
 
-const KINDS: { key: EntryKind }[] = [{ key: 'Mod' }, { key: 'Maintenance' }, { key: 'Expense' }]
+const KINDS: { key: EntryKind }[] = [{ key: 'Mod' }, { key: 'Maintenance' }, { key: 'Expense' }, { key: 'Event' }]
 
 export default function EntryForm() {
   const params = useParams()
@@ -37,6 +37,7 @@ export default function EntryForm() {
   const [endDate, setEndDate] = useState('')
   const [odometer, setOdometer] = useState('')
   const [vendor, setVendor] = useState('')
+  const [location, setLocation] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [parts, setParts] = useState<PartForm[]>([])
   const [cost, setCost] = useState('')
@@ -50,7 +51,7 @@ export default function EntryForm() {
     if (!existing) return
     setKind(existing.kind); setStatus(existing.status); setTitle(existing.title)
     setDate(existing.date ?? ''); setEndDate(existing.endDate ?? ''); setOdometer(existing.odometer?.toString() ?? '')
-    setVendor(existing.vendor ?? ''); setTags(existing.tags); setNotes(existing.notes ?? '')
+    setVendor(existing.vendor ?? ''); setLocation(existing.location ?? ''); setTags(existing.tags); setNotes(existing.notes ?? '')
     setParts(existing.lineItems.map(l => ({
       key: String(l.id), name: l.name, brand: l.brand ?? '', partNumber: l.partNumber ?? '',
       quantity: toInput(l.quantity), unitPrice: toInput(l.unitPrice, 2),
@@ -81,7 +82,7 @@ export default function EntryForm() {
       })
       const body: EntryInput = {
         kind, status, title, date: date || null, endDate: endDate || null, odometer: parseIntOrNull(odometer),
-        vendor: vendor || null, notes: notes || null, manualTotal: manual,
+        vendor: vendor || null, location: location || null, notes: notes || null, manualTotal: manual,
         relatedEntryId: relatedId ? Number(relatedId) : null, tags, lineItems,
       }
       const saved = isEdit
@@ -117,6 +118,8 @@ export default function EntryForm() {
   })
 
   if (isEdit && !existing) return <div className="center"><Spinner /></div>
+  /** Expenses and events can span a period (insurance year, a multi-day trip). */
+  const spans = kind === 'Expense' || kind === 'Event'
 
   return (
     <>
@@ -138,20 +141,22 @@ export default function EntryForm() {
           <div className="grow">
             <Field label={t('Title *', 'Titel *')}>
               <input required maxLength={200} value={title} onChange={e => setTitle(e.target.value)}
-                placeholder={kind === 'Mod' ? t('e.g. KW V3 coilovers', 'z. B. KW V3 Gewindefahrwerk') : kind === 'Maintenance' ? t('e.g. Oil change', 'z. B. Ölwechsel') : t('e.g. Insurance 2026', 'z. B. Versicherung 2026')} />
+                placeholder={kind === 'Mod' ? t('e.g. KW V3 coilovers', 'z. B. KW V3 Gewindefahrwerk') : kind === 'Maintenance' ? t('e.g. Oil change', 'z. B. Ölwechsel') : kind === 'Event' ? t('e.g. Track day Nürburgring', 'z. B. Trackday Nürburgring') : t('e.g. Insurance 2026', 'z. B. Versicherung 2026')} />
             </Field>
           </div>
         </div>
 
         <div className="grid-2">
-          <Field label={kind === 'Expense' ? t('Date / from', 'Datum / ab') : t('Date', 'Datum')}>
+          <Field label={spans ? t('Date / from', 'Datum / ab') : t('Date', 'Datum')}>
             <input type="date" value={date} onChange={e => setDate(e.target.value)} />
           </Field>
-          {kind === 'Expense'
+          {spans
             ? <Field label={t('Until (optional)', 'Bis (optional)')}><input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></Field>
             : <Field label={t('Odometer (km)', 'km-Stand')}><input inputMode="numeric" value={odometer} onChange={e => setOdometer(e.target.value)} /></Field>}
-          {kind === 'Expense' && <Field label={t('Odometer (km)', 'km-Stand')}><input inputMode="numeric" value={odometer} onChange={e => setOdometer(e.target.value)} /></Field>}
-          <Field label={t('Shop / vendor', 'Werkstatt / Händler')}><input value={vendor} onChange={e => setVendor(e.target.value)} /></Field>
+          {spans && <Field label={t('Odometer (km)', 'km-Stand')}><input inputMode="numeric" value={odometer} onChange={e => setOdometer(e.target.value)} /></Field>}
+          {kind === 'Event'
+            ? <Field label={t('Location', 'Ort')}><input value={location} onChange={e => setLocation(e.target.value)} placeholder={t('e.g. Nürburgring', 'z. B. Nürburgring')} /></Field>
+            : <Field label={t('Shop / vendor', 'Werkstatt / Händler')}><input value={vendor} onChange={e => setVendor(e.target.value)} /></Field>}
           {(parts.length === 0 || overrideTotal) && (
             <Field label={parts.length ? t('Total (€)', 'Summe (€)') : t('Cost (€)', 'Kosten (€)')}>
               <input inputMode="decimal" value={cost} onChange={e => setCost(e.target.value)} placeholder={t('0.00', '0,00')} />

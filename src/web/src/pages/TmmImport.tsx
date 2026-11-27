@@ -96,10 +96,10 @@ export default function TmmImport() {
           onRemove={() => setItems(xs => xs.filter(x => x.key !== item.key))} />
       ))}
 
-      {items.some(i => (i.preview?.fuelUps ?? 0) > 0) && (
+      {items.some(i => !i.result && (i.preview?.fuelUpsWithoutLiters ?? 0) > 0) && (
         <p className="faint">
-          {t('Track My Mods has no litres for fill-ups, so they count towards costs but not towards consumption.',
-            'Track My Mods speichert beim Tanken keine Liter – die Tankfüllungen zählen zu den Kosten, aber nicht zum Verbrauch.')}
+          {t('Fill-ups without litres count towards costs but not towards consumption (Track My Mods has no litres field).',
+            'Tankfüllungen ohne Liter zählen zu den Kosten, aber nicht zum Verbrauch (Track My Mods hat kein Feld für Liter).')}
         </p>
       )}
 
@@ -127,6 +127,7 @@ function FileCard({ item, vehicles, disabled, onTarget, onRemove }: {
     p.mods && plural(p.mods, ['mod', 'Mod'], ['mods', 'Mods']),
     p.maintenance && `${p.maintenance}× ${kindLabel('Maintenance')}`,
     p.expenses && plural(p.expenses, ['expense', 'Ausgabe'], ['expenses', 'Ausgaben']),
+    p.events && plural(p.events, ['event', 'Event'], ['events', 'Events']),
     p.fuelUps && plural(p.fuelUps, ['fill-up', 'Tankfüllung'], ['fill-ups', 'Tankfüllungen']),
   ].filter(Boolean).join(' · ')
   // Duplicates were checked against the matched car; only meaningful while that one is the target.

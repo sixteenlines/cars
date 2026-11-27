@@ -88,7 +88,7 @@ export function LangSwitch() {
 // ---- Shared vocabulary ---------------------------------------------------------------------------
 
 export const kindLabel = (k: EntryKind) =>
-  k === 'Mod' ? 'Mod' : k === 'Maintenance' ? t('Maintenance', 'Wartung') : t('Expense', 'Ausgabe')
+  k === 'Mod' ? 'Mod' : k === 'Maintenance' ? t('Maintenance', 'Wartung') : k === 'Event' ? 'Event' : t('Expense', 'Ausgabe')
 
 /** "1 entry" / "3 entries" — picks singular or plural. */
 export const plural = (n: number, one: [string, string], many: [string, string]) =>

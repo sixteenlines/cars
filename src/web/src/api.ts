@@ -1,7 +1,7 @@
 // Thin typed client for the ASP.NET Core API. Cookies carry the session (same origin).
 import { getLang, t } from './i18n'
 
-export type EntryKind = 'Mod' | 'Maintenance' | 'Expense'
+export type EntryKind = 'Mod' | 'Maintenance' | 'Expense' | 'Event'
 export type EntryStatus = 'Planned' | 'Done'
 
 export interface Me { id: string; email: string; displayName: string; isAdmin: boolean; language: 'en' | 'de' | null }
@@ -11,6 +11,7 @@ export interface VehicleStats {
   modCount: number; entryCount: number; plannedCount: number; lastMaintenanceDate: string | null
   latestOdometer: number | null; photoCount: number
   fuelTotal: number; fuelCount: number; lastFuelDate: string | null; avgConsumption: number | null
+  eventsTotal: number; eventCount: number
 }
 
 export interface Vehicle {
@@ -36,7 +37,7 @@ export interface EntryRef { id: number; title: string }
 
 export interface Entry {
   id: number; vehicleId: number; kind: EntryKind; status: EntryStatus; title: string
-  date: string | null; endDate: string | null; odometer: number | null; vendor: string | null; notes: string | null
+  date: string | null; endDate: string | null; odometer: number | null; vendor: string | null; location: string | null; notes: string | null
   currency: string; manualTotal: number | null; total: number
   relatedEntry: EntryRef | null; linkedEntries: EntryRef[]; tags: string[]; lineItems: LineItem[]; photos: Photo[]
   documents: { id: number; fileName: string; contentType: string; vendor: string | null; invoiceDate: string | null }[]
@@ -46,7 +47,7 @@ export interface Entry {
 export interface EntryInput {
   kind: EntryKind; status: EntryStatus; title: string; date: string | null; endDate: string | null
   odometer: number | null; vendor: string | null; notes: string | null; manualTotal: number | null
-  relatedEntryId: number | null; tags: string[]; lineItems: Omit<LineItem, 'id' | 'total'>[]
+  relatedEntryId: number | null; tags: string[]; lineItems: Omit<LineItem, 'id' | 'total'>[]; location?: string | null
 }
 
 export interface TagCount { name: string; count: number }
@@ -209,7 +210,7 @@ export interface TmmPreview {
     plate: string | null; vin: string | null; purchasePrice: number | null; purchaseDate: string | null; purchaseOdometer: number | null
   }
   matchVehicleId: number | null
-  mods: number; maintenance: number; expenses: number; planned: number; fuelUps: number; duplicates: number; total: number
+  mods: number; maintenance: number; expenses: number; events: number; planned: number; fuelUps: number; fuelUpsWithoutLiters: number; duplicates: number; total: number
   warnings: string[]
   items: { type: EntryKind | 'Fuel'; status: EntryStatus; title: string; date: string | null; cost: number; duplicate: boolean }[]
 }

@@ -6,7 +6,7 @@ namespace CarTracker.Api.Endpoints;
 public record VehicleStats(
     decimal TotalSpent, decimal ModsTotal, decimal MaintenanceTotal, decimal ExpensesTotal, decimal PlannedTotal,
     int ModCount, int EntryCount, int PlannedCount, DateOnly? LastMaintenanceDate, int? LatestOdometer, int PhotoCount,
-    decimal FuelTotal, int FuelCount, DateOnly? LastFuelDate, decimal? AvgConsumption);
+    decimal FuelTotal, int FuelCount, DateOnly? LastFuelDate, decimal? AvgConsumption, decimal EventsTotal, int EventCount);
 
 public record VehicleDto(
     int Id, string Name, string? Make, string? Model, int? Year, string? Badge,
@@ -33,12 +33,12 @@ public record EntryDto(
     int Id, int VehicleId, EntryKind Kind, EntryStatus Status, string Title, DateOnly? Date, DateOnly? EndDate,
     int? Odometer, string? Vendor, string? Notes, string Currency, decimal? ManualTotal, decimal Total,
     EntryRef? RelatedEntry, List<EntryRef> LinkedEntries, List<string> Tags, List<LineItemDto> LineItems,
-    List<PhotoDto> Photos, List<DocumentRef> Documents, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+    List<PhotoDto> Photos, List<DocumentRef> Documents, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, string? Location);
 
 public record EntryRequest(
     EntryKind Kind, EntryStatus Status, string Title, DateOnly? Date, DateOnly? EndDate, int? Odometer,
     string? Vendor, string? Notes, decimal? ManualTotal, int? RelatedEntryId,
-    List<string>? Tags, List<LineItemRequest>? LineItems);
+    List<string>? Tags, List<LineItemRequest>? LineItems, string? Location = null);
 
 public record TagDto(string Name, int Count);
 
@@ -57,7 +57,7 @@ public static class Mapping
             .Select(l => new LineItemDto(l.Id, l.Name, l.Brand, l.PartNumber, l.Quantity, l.UnitPrice, l.Total)).ToList(),
         e.Photos.OrderBy(p => p.TakenAt ?? p.UploadedAt).Select(p => p.ToDto()).ToList(),
         e.Documents.Select(d => new DocumentRef(d.Id, d.FileName, d.ContentType, d.Vendor, d.InvoiceDate)).ToList(),
-        e.CreatedAt, e.UpdatedAt);
+        e.CreatedAt, e.UpdatedAt, e.Location);
 
     public static VehicleStats Stats(Vehicle v)
     {
@@ -65,6 +65,7 @@ public static class Mapping
         var mods = done.Where(e => e.Kind == EntryKind.Mod).Sum(e => e.Total);
         var maint = done.Where(e => e.Kind == EntryKind.Maintenance).Sum(e => e.Total);
         var exp = done.Where(e => e.Kind == EntryKind.Expense).Sum(e => e.Total);
+        var events = done.Where(e => e.Kind == EntryKind.Event).Sum(e => e.Total);
         var purchase = v.IncludePurchaseInTotals ? v.PurchasePrice ?? 0 : 0;
         var planned = v.Entries.Where(e => e.Status == EntryStatus.Planned).ToList();
         var fuel = FuelMath.Compute(v.FuelUps, DateOnly.FromDateTime(DateTime.Now));
@@ -73,7 +74,7 @@ public static class Mapping
         var latestOdo = odos.Where(o => o.HasValue).Select(o => o!.Value).DefaultIfEmpty().Max();
 
         return new VehicleStats(
-            TotalSpent: mods + maint + exp + purchase + fuel.TotalCost,
+            TotalSpent: mods + maint + exp + events + purchase + fuel.TotalCost,
             ModsTotal: mods, MaintenanceTotal: maint, ExpensesTotal: exp,
             PlannedTotal: planned.Sum(e => e.Total),
             ModCount: done.Count(e => e.Kind == EntryKind.Mod),
@@ -82,7 +83,8 @@ public static class Mapping
             LastMaintenanceDate: done.Where(e => e.Kind == EntryKind.Maintenance).Max(e => e.Date),
             LatestOdometer: latestOdo == 0 ? null : latestOdo,
             PhotoCount: v.Photos.Count,
-            FuelTotal: fuel.TotalCost, FuelCount: fuel.Count, LastFuelDate: fuel.LastDate, AvgConsumption: fuel.AvgConsumption);
+            FuelTotal: fuel.TotalCost, FuelCount: fuel.Count, LastFuelDate: fuel.LastDate, AvgConsumption: fuel.AvgConsumption,
+            EventsTotal: events, EventCount: v.Entries.Count(e => e.Kind == EntryKind.Event));
     }
 
     public static VehicleDto ToDto(this Vehicle v) => new(

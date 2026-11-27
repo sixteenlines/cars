@@ -17,7 +17,7 @@ const MODES: { key: SplitMode; label: () => string }[] = [
   { key: 'category', label: () => t('By category', 'Nach Kategorie') },
   { key: 'item', label: () => t('Each item', 'Jede Position') },
 ]
-const KIND_OPTIONS: EntryKind[] = ['Mod', 'Maintenance', 'Expense']
+const KIND_OPTIONS: EntryKind[] = ['Mod', 'Maintenance', 'Expense', 'Event']
 const lineTypeLabel = (type: string): string | undefined => ({
   shipping: t('Shipping', 'Versand'), fee: t('Fee', 'Gebühr'), discount: t('Discount', 'Rabatt'), labour: t('Labour', 'Arbeitszeit'),
 } as Record<string, string>)[type]

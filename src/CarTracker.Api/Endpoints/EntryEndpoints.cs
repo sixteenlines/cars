@@ -24,7 +24,7 @@ public static class EntryEndpoints
             {
                 var needle = q.Trim();
                 bool Has(string? s) => s?.Contains(needle, StringComparison.OrdinalIgnoreCase) == true;
-                entries = entries.Where(e => Has(e.Title) || Has(e.Vendor) || Has(e.Notes)
+                entries = entries.Where(e => Has(e.Title) || Has(e.Vendor) || Has(e.Location) || Has(e.Notes)
                     || e.Tags.Any(x => Has(x.Name))
                     || e.LineItems.Any(l => Has(l.Name) || Has(l.PartNumber) || Has(l.Brand))).ToList();
             }
@@ -110,6 +110,7 @@ public static class EntryEndpoints
         e.EndDate = r.EndDate;
         e.Odometer = r.Odometer;
         e.Vendor = r.Vendor.Clean(200);
+        e.Location = r.Location.Clean(200);
         e.Notes = r.Notes.Clean(8000);
         e.ManualTotal = r.ManualTotal;
         e.RelatedEntryId = r.RelatedEntryId;

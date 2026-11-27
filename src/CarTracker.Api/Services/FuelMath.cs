@@ -71,8 +71,9 @@ public static class FuelMath
         var segCost = good.Sum(s => s.Cost);
         var last = ordered.LastOrDefault();
 
-        var ppl = fills.Where(f => f.Grade is not null && f.Liters is > 0)
-            .GroupBy(f => f.Grade!)
+        // Fill-ups without a grade (imported) get their own "unknown" average instead of disappearing.
+        var ppl = fills.Where(f => f.Liters is > 0)
+            .GroupBy(f => f.Grade ?? "unknown")
             .ToDictionary(g => g.Key, g => Math.Round(g.Sum(f => f.Total) / g.Sum(f => f.Liters!.Value), 3));
 
         return new Stats(

@@ -58,7 +58,7 @@ public class Vehicle
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<EntryKind>))]
-public enum EntryKind { Mod = 0, Maintenance = 1, Expense = 2 }
+public enum EntryKind { Mod = 0, Maintenance = 1, Expense = 2, Event = 3 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<EntryStatus>))]
 public enum EntryStatus { Planned = 0, Done = 1 }
@@ -76,6 +76,8 @@ public class Entry
     public DateOnly? EndDate { get; set; }
     public int? Odometer { get; set; }
     public string? Vendor { get; set; }
+    /// <summary>Where it happened — mainly for events (track day, meet, trip).</summary>
+    public string? Location { get; set; }
     public string? Notes { get; set; }
     public string Currency { get; set; } = "EUR";
 
