@@ -18,14 +18,26 @@ public static class AuthEndpoints
     {
         var g = api.MapGroup("/auth");
 
-        g.MapPost("/login", async (LoginRequest req, SignInManager<AppUser> signIn, UserManager<AppUser> users) =>
+        g.MapPost("/login", async (LoginRequest req, SignInManager<AppUser> signIn, UserManager<AppUser> users,
+            LoginGuard guard, HttpContext ctx) =>
         {
-            var user = await users.FindByEmailAsync(req.Email.Trim());
-            if (user is null) return Loc.Problem("Wrong email or password.", "E-Mail oder Passwort ist falsch.", 401);
+            var ip = ClientIp.Get(ctx);
+            if (guard.IsBlocked(ip)) return Blocked();
+            var email = req.Email.Trim();
+            var what = $"login for {(email.Length > 100 ? email[..100] : email)}";
+
+            var user = await users.FindByEmailAsync(email);
+            if (user is null)
+            {
+                guard.Failure(ip, what + " (unknown email)");
+                return Loc.Problem("Wrong email or password.", "E-Mail oder Passwort ist falsch.", 401);
+            }
 
             var result = await signIn.PasswordSignInAsync(user, req.Password, isPersistent: true, lockoutOnFailure: true);
+            if (!result.Succeeded) guard.Failure(ip, what + (result.IsLockedOut ? " (account locked)" : ""));
             if (result.IsLockedOut) return Loc.Problem("Too many failed attempts. Try again in 15 minutes.", "Zu viele Fehlversuche. Versuch es in 15 Minuten nochmal.", 423);
             if (!result.Succeeded) return Loc.Problem("Wrong email or password.", "E-Mail oder Passwort ist falsch.", 401);
+            guard.Success(ip);
             return Results.Ok(ToMe(user));
         }).RequireRateLimiting("auth");
 
@@ -51,16 +63,22 @@ public static class AuthEndpoints
             return Results.Ok(ToMe(user));
         }).RequireAuthorization();
 
-        g.MapGet("/invite/{code}", async (string code, AppDbContext db) =>
+        g.MapGet("/invite/{code}", async (string code, AppDbContext db, LoginGuard guard, HttpContext ctx) =>
         {
+            var ip = ClientIp.Get(ctx);
+            if (guard.IsBlocked(ip)) return Blocked();
             var invite = await FindOpenInvite(db, code);
+            if (invite is null) guard.Failure(ip, "invite code check");
             return Results.Ok(new InviteCheckResponse(invite is not null, invite?.Note));
         }).RequireRateLimiting("auth");
 
         g.MapPost("/register", async (RegisterRequest req, AppDbContext db, UserManager<AppUser> users,
-            SignInManager<AppUser> signIn) =>
+            SignInManager<AppUser> signIn, LoginGuard guard, HttpContext ctx) =>
         {
+            var ip = ClientIp.Get(ctx);
+            if (guard.IsBlocked(ip)) return Blocked();
             var invite = await FindOpenInvite(db, req.Code);
+            if (invite is null) guard.Failure(ip, "registration (invalid invite code)");
             if (invite is null) return Loc.Problem("This invite is invalid, used or expired.", "Diese Einladung ist ungültig, schon benutzt oder abgelaufen.", 400);
 
             var name = req.DisplayName.Trim();
@@ -86,6 +104,10 @@ public static class AuthEndpoints
             return Results.Ok(ToMe(user));
         }).RequireRateLimiting("auth");
     }
+
+    private static IResult Blocked() => Loc.Problem(
+        "Too many failed attempts from your connection. Try again later.",
+        "Zu viele Fehlversuche von deiner Verbindung. Versuch es später nochmal.", 429);
 
     private static Task<Invite?> FindOpenInvite(AppDbContext db, string code)
     {

@@ -70,6 +70,11 @@ builder.Services.AddRateLimiter(o =>
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
 });
 
+// fail2ban-style: IPs that keep failing are blocked for a day (Security:MaxFailures / WindowMinutes / BanHours).
+builder.Services.AddSingleton(builder.Configuration.GetSection("Security").Get<LoginGuardOptions>() ?? new LoginGuardOptions());
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<LoginGuard>();
+
 // ---- Uploads ---------------------------------------------------------------
 const long maxUpload = 100L * 1024 * 1024; // matches Cloudflare free plan request limit
 builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = maxUpload);

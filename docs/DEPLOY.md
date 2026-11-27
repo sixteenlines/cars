@@ -145,6 +145,14 @@ ssh cars 'cd /opt/car-tracker && docker compose logs --tail 100 app'
 ssh cars 'cd /opt/car-tracker && docker compose logs --tail 50 cloudflared'
 ```
 
+**Login protection.** Three layers: 8 wrong passwords lock that account for 15 min; each IP gets 10 login/register
+attempts per minute; an IP with 20 failures (wrong password, unknown email, invalid invite code) within an hour is
+blocked from login and registration for 24 h. Bans live in memory, so restarting the app lifts them. Every failure
+and every block is logged:
+```bash
+ssh cars 'cd /opt/car-tracker && docker compose logs app | grep -E "Failed (login|registration|invite)|Blocked"'
+```
+
 **Backups.** Everything that matters is `/opt/car-tracker/data` (plus `.env`). Back it up to a different
 machine — e.g. the hypervisor's backup jobs or a nightly copy. For a consistent file copy stop the app first
 (`docker compose stop app`); `update.sh` keeps DB copies of the last updates in `backups/`.
