@@ -4,6 +4,7 @@
 #   ./update.sh            install the latest GitHub release
 #   ./update.sh 1.2.0      install that version (also how you go back to an older one)
 #   ./update.sh --check    only show installed vs. latest version
+#   ./update.sh --auto on  install new releases by itself every night (systemd timer); off / status
 #
 # Lives in /opt/car-tracker next to .env and data/. Needs docker and curl. Run as root.
 set -euo pipefail
@@ -37,13 +38,60 @@ probe() {
 }
 probe_wait() { for _ in $(seq 1 45); do probe "$1" && return 0; sleep 2; done; return 1; }
 
+UNIT=car-tracker-update
+auto() {
+  local dir=/etc/systemd/system self; self="$(readlink -f "$0")"
+  command -v systemctl >/dev/null || die "systemd not found."
+  case "${1:-status}" in
+    on)
+      cat > "$dir/$UNIT.service" <<EOF
+[Unit]
+Description=Install the latest Car Tracker release
+After=docker.service network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+ExecStart=$self
+EOF
+      cat > "$dir/$UNIT.timer" <<EOF
+[Unit]
+Description=Nightly Car Tracker update
+[Timer]
+OnCalendar=*-*-* 04:00
+RandomizedDelaySec=30m
+Persistent=true
+[Install]
+WantedBy=timers.target
+EOF
+      chmod 644 "$dir/$UNIT.service" "$dir/$UNIT.timer"
+      systemctl daemon-reload && systemctl enable --now "$UNIT.timer" >/dev/null
+      echo "✓ Automatic updates on: new releases are installed every night between 04:00 and 04:30."
+      echo "  What happened: journalctl -u $UNIT   ·   Turn off: $self --auto off" ;;
+    off)
+      systemctl disable --now "$UNIT.timer" >/dev/null 2>&1 || true
+      rm -f "$dir/$UNIT.service" "$dir/$UNIT.timer"; systemctl daemon-reload
+      echo "✓ Automatic updates off." ;;
+    status)
+      if systemctl is-enabled -q "$UNIT.timer" 2>/dev/null; then
+        echo "Automatic updates: on"; systemctl list-timers "$UNIT.timer" --no-pager | head -2
+        echo "Last run:"; journalctl -u "$UNIT" -n 8 --no-pager -o cat 2>/dev/null || true
+      else echo "Automatic updates: off  (turn on: $self --auto on)"; fi ;;
+    *) die "Usage: $self --auto on|off|status" ;;
+  esac
+}
+
 current="$(env_get APP_VERSION)"
 case "${1:-}" in
   --check) echo "installed: ${current:-none}"; echo "latest:    $(latest_release)"; exit 0 ;;
+  --auto) auto "${2:-status}"; exit 0 ;;
   "") target="$(latest_release)" || die "Couldn't ask GitHub for the latest release." ;;
   *) target="${1#v}" ;;
 esac
 [[ -n "$target" ]] || die "No release found."
+
+# One update at a time (the nightly timer and a manual run could otherwise overlap).
+exec 9>.update.lock
+flock -n 9 || die "Another update is running right now."
 
 if [[ "$target" == "$current" ]] && probe "$target"; then
   echo "✓ $target is already installed and running."; exit 0

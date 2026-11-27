@@ -116,31 +116,23 @@ ssh cars 'cd /opt/car-tracker && docker compose logs app | grep register'
 release changed the DB schema, also restore the DB from the backup taken when you updated:
 `docker compose stop app && cp -a backups/<folder>/cartracker.db* data/ && docker compose up -d`.
 
-### Optional: semi-automatic updates
-Once updates have been boring for a while, let the server install new releases at night — publishing a
-release then *is* the deploy decision:
+### Optional: automatic updates
+Let the server install new releases by itself every night (04:00–04:30, systemd timer). Pushing a release tag
+then *is* the deploy decision; backup and rollback work the same as a manual run.
 
 ```bash
-cat > /etc/systemd/system/car-tracker-update.service <<'EOF'
-[Unit]
-Description=Install latest Car Tracker release
-[Service]
-Type=oneshot
-ExecStart=/opt/car-tracker/update.sh
-EOF
-cat > /etc/systemd/system/car-tracker-update.timer <<'EOF'
-[Unit]
-Description=Nightly Car Tracker update
-[Timer]
-OnCalendar=*-*-* 04:00
-RandomizedDelaySec=30m
-Persistent=true
-[Install]
-WantedBy=timers.target
-EOF
-systemctl daemon-reload && systemctl enable --now car-tracker-update.timer
-journalctl -u car-tracker-update   # what happened
+ssh cars /opt/car-tracker/update.sh --auto on       # turn on
+ssh cars /opt/car-tracker/update.sh --auto status   # next run + last run's output
+ssh cars /opt/car-tracker/update.sh --auto off      # turn off
+ssh cars journalctl -u car-tracker-update           # full history
 ```
+
+Nights without a new release do nothing (the app keeps running). With one, the app is down for about half a
+minute. A failed update rolls back and shows up as a failed unit (`systemctl --failed`). A manual `update.sh`
+and the timer never run at the same time.
+
+`update.sh` doesn't update itself: if your copy is older than `--auto`, download it again first (the `curl`
+line in 1.4).
 
 ---
 
