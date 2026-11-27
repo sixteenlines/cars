@@ -7,6 +7,7 @@ import { ErrorText, Spinner, TopBar } from '../components/ui'
 import { fmtDate, fmtMoney } from '../format'
 import { useVehicles } from '../hooks'
 import { t } from '../i18n'
+import { isBillFile, pasteKey, usePasteFiles } from '../paste'
 
 export const inboxKey = ['documents', 'open'] as const
 export const useInbox = () =>
@@ -54,6 +55,8 @@ export default function ImportUpload() {
     if (list.length === 1 && lastId) navigate(`/import/${lastId}`)
   }
 
+  usePasteFiles(files => upload(files), isBillFile, busy === 0)
+
   const vehicleName = (id: number | null) => vehicles.find(v => v.id === id)?.name
 
   return (
@@ -81,13 +84,16 @@ export default function ImportUpload() {
             <Camera size={18} /> {t('Photo', 'Foto')}
           </button>
         </div>
-        <p className="faint hide-touch" style={{ margin: 0 }}>{t('…or drop files here', '…oder Dateien hierher ziehen')}</p>
+        <p className="faint hide-touch" style={{ margin: 0 }}>{t(`…or drop files here, or paste with ${pasteKey()}`, `…oder Dateien hierher ziehen bzw. mit ${pasteKey()} einfügen`)}</p>
         <input ref={fileInput} type="file" hidden multiple accept="application/pdf,.pdf,image/*,.heic,.heif"
           onChange={e => { upload(e.target.files); e.target.value = '' }} />
         <input ref={cameraInput} type="file" hidden accept="image/*" capture="environment"
           onChange={e => { upload(e.target.files); e.target.value = '' }} />
       </div>
       <ErrorText error={error} />
+      <p className="faint" style={{ textAlign: 'center' }}>
+        <Link to="/import/tmm" className="link">{t('Coming from Track My Mods? Import CSV exports', 'Du kommst von Track My Mods? CSV-Exporte importieren')}</Link>
+      </p>
 
       {inbox.length > 0 && (
         <div className="section">

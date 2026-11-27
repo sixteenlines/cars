@@ -43,6 +43,7 @@ export default function Garage() {
           <Empty icon={<Car size={40} />} title={t('No cars yet', 'Noch keine Autos')}>
             <p>{t('Add your first car to start tracking mods and costs.', 'Leg dein erstes Auto an, um Mods und Kosten festzuhalten.')}</p>
             <Link to="/vehicles/new" className="btn btn-primary"><Plus size={18} /> {t('Add car', 'Auto hinzufügen')}</Link>
+            <p style={{ marginTop: 14 }}><Link to="/import/tmm" className="link">{t('Coming from Track My Mods? Import your CSV exports', 'Du kommst von Track My Mods? CSV-Exporte importieren')}</Link></p>
           </Empty>
         </div>
       )}

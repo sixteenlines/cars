@@ -16,6 +16,7 @@ import ImportUpload from './pages/ImportUpload'
 import ImportReview from './pages/ImportReview'
 import FuelForm from './pages/FuelForm'
 import Settings from './pages/Settings'
+import TmmImport from './pages/TmmImport'
 
 function RequireAuth({ children, admin }: { children: React.ReactNode; admin?: boolean }) {
   const { data: me, isLoading } = useMe()
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="/vehicles/:id/fuel/new" element={<RequireAuth><FuelForm /></RequireAuth>} />
         <Route path="/fuel/:fuelId/edit" element={<RequireAuth><FuelForm /></RequireAuth>} />
         <Route path="/import" element={<RequireAuth><ImportUpload /></RequireAuth>} />
+        <Route path="/import/tmm" element={<RequireAuth><TmmImport /></RequireAuth>} />
         <Route path="/import/:docId" element={<RequireAuth><ImportReview /></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
         <Route path="/admin" element={<RequireAuth admin><Admin /></RequireAuth>} />

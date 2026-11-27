@@ -199,3 +199,31 @@ export function scanFuel(file: File) {
   form.append('file', file)
   return api.post<FuelScan>('/fuel/scan', form)
 }
+
+// ---- Track My Mods import --------------------------------------------------------------------------
+
+export interface TmmPreview {
+  fileName: string
+  vehicle: {
+    name: string; make: string | null; model: string | null; year: number | null; badge: string | null
+    plate: string | null; vin: string | null; purchasePrice: number | null; purchaseDate: string | null; purchaseOdometer: number | null
+  }
+  matchVehicleId: number | null
+  mods: number; maintenance: number; expenses: number; planned: number; fuelUps: number; duplicates: number; total: number
+  warnings: string[]
+  items: { type: EntryKind | 'Fuel'; status: EntryStatus; title: string; date: string | null; cost: number; duplicate: boolean }[]
+}
+export interface TmmResult { vehicleId: number; vehicleName: string; entries: number; fuelUps: number; skipped: number }
+
+export function previewTmm(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return api.post<TmmPreview>('/import/tmm/preview', form)
+}
+
+export function importTmm(file: File, vehicleId: number | null) {
+  const form = new FormData()
+  form.append('file', file)
+  if (vehicleId) form.append('vehicleId', String(vehicleId))
+  return api.post<TmmResult>('/import/tmm', form)
+}

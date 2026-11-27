@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { LogOut } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { FileSpreadsheet, LogOut } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 import { api, type Me } from '../api'
 import { ErrorText, Field, TopBar } from '../components/ui'
 import { keys, useMe } from '../hooks'
@@ -48,7 +48,11 @@ export default function Settings() {
         </Field>
         <ErrorText error={saveLang.error} />
 
-        <button type="button" className="btn btn-block" style={{ marginTop: 16 }} disabled={logout.isPending} onClick={() => logout.mutate()}>
+        <Link to="/import/tmm" className="btn btn-block" style={{ marginTop: 16 }}>
+          <FileSpreadsheet size={18} /> {t('Import from Track My Mods', 'Import aus Track My Mods')}
+        </Link>
+
+        <button type="button" className="btn btn-block" disabled={logout.isPending} onClick={() => logout.mutate()}>
           <LogOut size={18} /> {t('Sign out', 'Abmelden')}
         </button>
         <ErrorText error={logout.error} />

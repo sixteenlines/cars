@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { photoUrl, type Photo } from '../api'
 import { ConfirmButton, Spinner } from './ui'
 import { t } from '../i18n'
+import { isImage, pasteKey, usePasteFiles } from '../paste'
 
 export interface PendingPhoto { key: string; file: File; preview: string }
 
@@ -29,9 +30,10 @@ export function PhotoGrid({ photos, pending = [], uploading, coverId, onAdd, onR
   const [over, setOver] = useState(false)
   const [open, setOpen] = useState<number | null>(null)
 
-  const handleFiles = (files: FileList | null) => {
+  const handleFiles = (files: FileList | File[] | null) => {
     if (files?.length) onAdd(toPending(files))
   }
+  usePasteFiles(handleFiles, isImage, !uploading)
 
   return (
     <div
@@ -40,7 +42,8 @@ export function PhotoGrid({ photos, pending = [], uploading, coverId, onAdd, onR
       onDrop={e => { e.preventDefault(); setOver(false); handleFiles(e.dataTransfer.files) }}
     >
       <div className="photo-grid">
-        <button type="button" className={`drop ${over ? 'over' : ''}`} onClick={() => input.current?.click()}>
+        <button type="button" className={`drop ${over ? 'over' : ''}`} onClick={() => input.current?.click()}
+          title={t(`…or paste with ${pasteKey()}`, `…oder mit ${pasteKey()} einfügen`)}>
           {uploading ? <Spinner /> : <ImagePlus size={26} />}
           {uploading ? t('Uploading…', 'Lädt hoch…') : addLabel}
         </button>

@@ -141,6 +141,7 @@ api.MapPhotoEndpoints();
 api.MapTagEndpoints();
 api.MapDocumentEndpoints();
 api.MapFuelEndpoints();
+api.MapTmmEndpoints();
 var appVersion = app.Configuration["AppVersion"] ?? "dev";
 api.MapGet("/health", () => Results.Ok(new { status = "ok", version = appVersion }));
 

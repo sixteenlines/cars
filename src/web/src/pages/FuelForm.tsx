@@ -7,6 +7,7 @@ import { ConfirmButton, ErrorText, Field, Spinner, TopBar } from '../components/
 import { fmtKm, fmtNum, parseDecimal, parseIntOrNull, toInput, today } from '../format'
 import { keys, useFuel, useFuelUp, useVehicle } from '../hooks'
 import { t } from '../i18n'
+import { isImage, usePasteFiles } from '../paste'
 
 type Num = 'total' | 'ppl' | 'liters'
 const ALL: Num[] = ['total', 'ppl', 'liters']
@@ -93,6 +94,8 @@ export default function FuelForm() {
     e.target.value = ''
     if (file) { setScanned(null); scan.mutate(file) }
   }
+
+  usePasteFiles(files => { setScanned(null); scan.mutate(files[0]) }, isImage, !scan.isPending)
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['fuel'] })

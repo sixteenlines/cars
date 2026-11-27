@@ -19,6 +19,9 @@ public static class Loc
     /// <summary>Money for messages, formatted for the current language.</summary>
     public static string Money(decimal v) => IsGerman ? v.ToString("N2", German) + " €" : v.ToString("N2", CultureInfo.InvariantCulture) + " €";
 
+    /// <summary>Date for messages: 31.01.2026 / 31/01/2026.</summary>
+    public static string Date(DateOnly d) => d.ToString(IsGerman ? "dd.MM.yyyy" : "dd/MM/yyyy", CultureInfo.InvariantCulture);
+
     public static string? Normalize(string? lang) => lang?.Trim().ToLowerInvariant() switch
     {
         ['d', 'e', ..] => "de",
